@@ -1,20 +1,4 @@
-workflows:
-  ios-workflow:
-    name: Build iOS IPA for Swipeology
-    max_build_duration: 120
-    instance_type: mac_mini_m2
-    integrations:
-      app_store_connect: SWIPEOLOGY
-    environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: app.rork.swipeology-dating-app
-      vars:
-        NODE_OPTIONS: "--max-old-space-size=4096"
-        XCODE_WORKSPACE: "ios/SwipeologyDatingApp.xcworkspace"
-        XCODE_SCHEME: "SwipeologyDatingApp"
-      node: 20
-      cocoapods: default
+
     scripts:
       - name: Install dependencies
         script: |
@@ -25,7 +9,9 @@ workflows:
           npx expo prebuild --clean --platform ios
       - name: Fetch signing files from App Store Connect 
         script: | 
-          app-store-connect 
+          app-store-connect fetch-signing-files "app.rork.swipeology-dating-app" \
+            --type IOS_APP_STORE \
+            --create
       
       - name: Build IPA
         script: |
@@ -33,11 +19,4 @@ workflows:
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
     
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
     
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
