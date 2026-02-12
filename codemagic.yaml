@@ -3,67 +3,53 @@ workflows:
     name: Build iOS IPA for Swipeology
     max_build_duration: 120
     instance_type: mac_mini_m2
-
     integrations:
       app_store_connect: SWIPEOLOGY
-
     environment:
       vars:
         NODE_OPTIONS: "--max-old-space-size=4096"
         BUNDLE_ID: "app.rork.swipeology-dating-app"
-        APPLE_TEAM_ID: "KK456TT8Z5"
         XCODE_WORKSPACE: "ios/SwipeologyDatingApp.xcworkspace"
         XCODE_SCHEME: "SwipeologyDatingApp"
       node: 20
       cocoapods: default
-
     scripts:
       - name: Install dependencies
         script: |
           npm install
-
       - name: Prebuild native iOS project
         script: |
           npx expo prebuild --clean --platform ios
-
       - name: Set up keychain for code signing
         script: |
           keychain initialize
-
       - name: Fetch signing files from App Store Connect
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-
       - name: Add certificates to keychain
         script: |
           keychain add-certificates
-
       - name: Apply provisioning profiles to Xcode project
         script: |
           xcode-project use-profiles
-
+      - name: Increment build number
+        script: |
+          cd ios
+          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID") + 1))
       - name: Build iOS archive
         script: |
-          xcodebuild \
-            -workspace "$XCODE_WORKSPACE" \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -archivePath build/SwipeologyDatingApp.xcarchive \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            archive
-
-      - name: Export IPA
-        script: |
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/SwipeologyDatingApp.xcarchive \
-            -exportOptionsPlist ios/exportOptions.plist \
-            -exportPath build
-
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
-      - build/*.ipa
-      - build/**/*.dSYM
-      - build/**/*.xcarchive
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
