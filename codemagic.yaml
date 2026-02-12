@@ -32,11 +32,9 @@ workflows:
 
       - name: Fetch signing files from App Store Connect
         script: |
-          app-store-connect fetch-signing-files \
-            --bundle-id "$BUNDLE_ID" \
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-
 
       - name: Add certificates to keychain
         script: |
