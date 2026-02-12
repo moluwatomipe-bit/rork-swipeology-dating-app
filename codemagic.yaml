@@ -6,9 +6,11 @@ workflows:
     integrations:
       app_store_connect: SWIPEOLOGY
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.rork.swipeology-dating-app
       vars:
         NODE_OPTIONS: "--max-old-space-size=4096"
-        BUNDLE_ID: "app.rork.swipeology-dating-app"
         XCODE_WORKSPACE: "ios/SwipeologyDatingApp.xcworkspace"
         XCODE_SCHEME: "SwipeologyDatingApp"
       node: 20
@@ -20,24 +22,6 @@ workflows:
       - name: Prebuild native iOS project
         script: |
           npx expo prebuild --clean --platform ios
-      - name: Set up keychain for code signing
-        script: |
-          keychain initialize
-      - name: Fetch signing files from App Store Connect
-        script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-      - name: Add certificates to keychain
-        script: |
-          keychain add-certificates
-      - name: Apply provisioning profiles to Xcode project
-        script: |
-          xcode-project use-profiles
-      - name: Increment build number
-        script: |
-          cd ios
-          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID") + 1))
       - name: Build iOS archive
         script: |
           xcode-project build-ipa \
@@ -46,10 +30,3 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
