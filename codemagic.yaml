@@ -11,8 +11,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: app.rork.swipeology-dating-app
-        app_store_connect:
-          api_key: SWIPEOLOGY
       vars:
         NODE_OPTIONS: "--max-old-space-size=4096"
         XCODE_WORKSPACE: "ios/SwipeologyDatingApp.xcworkspace"
@@ -29,12 +27,6 @@ workflows:
         script: |
           npx expo prebuild --clean --platform ios
 
-      - name: Fetch signing files from App Store Connect
-        script: |
-          app-store-connect fetch-signing-files "app.rork.swipeology-dating-app" \
-            --type IOS_APP_STORE \
-            --create
-      
       - name: Build IPA
         script: |
           xcode-project build-ipa \
@@ -49,3 +41,5 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  
