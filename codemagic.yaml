@@ -11,6 +11,8 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: app.rork.swipeology-dating-app
+        app_store_connect:
+          api_key: SWIPEOLOGY
       vars:
         NODE_OPTIONS: "--max-old-space-size=4096"
         XCODE_WORKSPACE: "ios/SwipeologyDatingApp.xcworkspace"
