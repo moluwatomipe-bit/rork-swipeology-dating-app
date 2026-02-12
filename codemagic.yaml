@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m2
 
     integrations:
-      app_store_connect: swipeology-key   # ← CHANGE THIS to your real integration name from Codemagic
+      app_store_connect: SWIPEOLOGY
 
     environment:
       vars:
