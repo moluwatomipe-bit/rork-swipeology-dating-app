@@ -15,8 +15,7 @@ workflows:
           npx expo prebuild --clean --platform ios 
       - name: Build iOS archive 
         script: | 
-          xcodebuild \ 
-            -workspace ios/SwipeologyDatingApp.xcworkspace \ 
+          xcodebuild -workspace ios/SwipeologyDatingApp.xcworkspace \ 
             -scheme SwipeologyDatingApp \ 
             -configuration Release \ 
             -archivePath build/SwipeologyDatingApp.xcarchive \ 
