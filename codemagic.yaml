@@ -5,7 +5,6 @@ workflows:
       vars: 
         NODE_OPTIONS: "--max-old-space-size=4096" 
       node: 20 
-      xcode: 15.2 
       cocoapods: default 
     scripts: 
       - name: Install dependencies 
