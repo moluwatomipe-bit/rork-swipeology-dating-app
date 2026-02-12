@@ -42,4 +42,3 @@ workflows:
         auth: integration
         submit_to_testflight: true
 
-  
