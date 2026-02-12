@@ -23,6 +23,11 @@ workflows:
       - name: Prebuild native iOS project
         script: |
           npx expo prebuild --clean --platform ios
+      - name: Fetch signing files from App Store Connect 
+        script: | 
+        app-store-connect fetch-signing-files "app.rork.swipeology-dating-app" \ 
+        --type IOS_APP_STORE \ 
+        --create
       
       - name: Build IPA
         script: |
