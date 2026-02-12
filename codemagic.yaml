@@ -1,15 +1,35 @@
 workflows: 
   ios-workflow: 
-    name: iOS build 
+    name: Build iOS IPA for Swipeology
     environment: 
-      node: latest 
+      vars: 
+        NODE_OPTIONS: "--max-old-space-size=4096" 
+      node: 20 
+      xcode: 15.4 
+      cocoapods: default 
     scripts: 
       - name: Install dependencies 
         script: | 
           npm install 
-      - name: Build iOS app 
+      - name: Prebuild native iOS project 
         script: | 
-          npx expo prebuild 
-          npx expo run:ios --no-install 
+          npx expo prebuild --clean --platform ios 
+      - name: Build iOS archive 
+        script: | 
+          xcodebuild \ 
+            -workspace ios/SwipeologyDatingApp.xcworkspace \ 
+            -scheme SwipeologyDatingApp \ 
+            -configuration Release \ 
+            -archivePath build/SwipeologyDatingApp.xcarchive \ 
+            archive 
+      - name: Export IPA 
+        script: | 
+          xcodebuild \ 
+            -exportArchive \ 
+            -archivePath build/SwipeologyDatingApp.xcarchive \ 
+            -exportOptionsPlist ios/exportOptions.plist \ 
+            -exportPath build 
     artifacts: 
-      - build/ios/**/*.ipa
+      - build/*.ipa 
+      - build/**/*.dSYM 
+      - build/**/*.xcarchive
