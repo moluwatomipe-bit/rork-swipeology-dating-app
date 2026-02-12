@@ -1,0 +1,15 @@
+workflows: 
+  ios-workflow: 
+    name: iOS build 
+    environment: 
+      node: latest 
+    scripts: 
+      - name: Install dependencies 
+        script: | 
+          npm install 
+      - name: Build iOS app 
+        script: | 
+          npx expo prebuild 
+          npx expo run:ios --no-install 
+    artifacts: 
+      - build/ios/**/*.ipa
