@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Swipe, Match, Message, User } from '@/types';
 import { MOCK_USERS } from '@/mocks/users';
 import { useAuth } from './AuthContext';
@@ -12,7 +12,7 @@ const STORAGE_MESSAGES = '@swipeology_messages';
 
 export const [DataProvider, useData] = createContextHook(() => {
   const { currentUser } = useAuth();
-  const queryClient = useQueryClient();
+
   const [swipes, setSwipes] = useState<Swipe[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -83,6 +83,8 @@ export const [DataProvider, useData] = createContextHook(() => {
     },
   });
 
+  const { mutate: addMessageMutate } = addMessageMutation;
+
   const sendMessage = useCallback((matchId: string, text: string) => {
     if (!currentUser) return;
     const msg: Message = {
@@ -93,8 +95,11 @@ export const [DataProvider, useData] = createContextHook(() => {
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, msg]);
-    addMessageMutation.mutate(msg);
-  }, [currentUser, addMessageMutation]);
+    addMessageMutate(msg);
+  }, [currentUser, addMessageMutate]);
+
+  const { mutate: addSwipeMutate } = addSwipeMutation;
+  const { mutate: addMatchMutate } = addMatchMutation;
 
   const performSwipe = useCallback((userId: string, context: 'friends' | 'dating', liked: boolean): Match | null => {
     if (!currentUser) return null;
@@ -110,7 +115,7 @@ export const [DataProvider, useData] = createContextHook(() => {
 
     const updatedSwipes = [...swipes, swipe];
     setSwipes(updatedSwipes);
-    addSwipeMutation.mutate(swipe);
+    addSwipeMutate(swipe);
 
     if (liked) {
       const mutualSwipe = updatedSwipes.find(
@@ -131,7 +136,7 @@ export const [DataProvider, useData] = createContextHook(() => {
         };
         const updatedMatches = [...matches, match];
         setMatches(updatedMatches);
-        addMatchMutation.mutate(match);
+        addMatchMutate(match);
         return match;
       }
 
@@ -158,13 +163,13 @@ export const [DataProvider, useData] = createContextHook(() => {
         };
         const updatedMatches = [...matches, match];
         setMatches(updatedMatches);
-        addMatchMutation.mutate(match);
+        addMatchMutate(match);
         return match;
       }
     }
 
     return null;
-  }, [currentUser, swipes, matches]);
+  }, [currentUser, swipes, matches, addSwipeMutate, addMatchMutate]);
 
   const getFilteredUsers = useCallback((context: 'friends' | 'dating'): User[] => {
     if (!currentUser) return [];

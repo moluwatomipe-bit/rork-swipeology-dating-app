@@ -56,16 +56,20 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  const { mutate: saveUser } = saveUserMutation;
+
   const updateUser = useCallback((updates: Partial<User>) => {
     const updated = { ...currentUser, ...updates } as User;
     setCurrentUser(updated);
-    saveUserMutation.mutate(updated);
-  }, [currentUser]);
+    saveUser(updated);
+  }, [currentUser, saveUser]);
+
+  const { mutate: saveStep } = saveOnboardingStepMutation;
 
   const goToStep = useCallback((step: OnboardingStep) => {
     setOnboardingStep(step);
-    saveOnboardingStepMutation.mutate(step);
-  }, []);
+    saveStep(step);
+  }, [saveStep]);
 
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
@@ -89,13 +93,17 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  const { mutate: doLogout } = logoutMutation;
+
   const logout = useCallback(() => {
-    logoutMutation.mutate();
-  }, []);
+    doLogout();
+  }, [doLogout]);
+
+  const { mutate: doDelete } = deleteAccountMutation;
 
   const deleteAccount = useCallback(() => {
-    deleteAccountMutation.mutate();
-  }, []);
+    doDelete();
+  }, [doDelete]);
 
   return {
     currentUser,

@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Animated,
   Dimensions,
 } from 'react-native';
@@ -44,7 +43,7 @@ type DatingPrefOption = 'men' | 'women' | 'both';
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const { onboardingStep, goToStep, updateUser, currentUser } = useAuth();
+  const { onboardingStep, goToStep, updateUser } = useAuth();
   const { requestPermissions } = useNotifications();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -184,7 +183,7 @@ export default function OnboardingScreen() {
         </View>
         <Text style={styles.stepTitle}>Verify your phone</Text>
         <Text style={styles.stepDescription}>
-          We'll send you a verification code
+          We&apos;ll send you a verification code
         </Text>
       </View>
 
@@ -378,7 +377,7 @@ export default function OnboardingScreen() {
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepHeader}>
-          <Text style={styles.stepTitle}>What's your gender?</Text>
+          <Text style={styles.stepTitle}>What&apos;s your gender?</Text>
         </View>
 
         <View style={styles.optionsContainer}>
@@ -763,7 +762,7 @@ export default function OnboardingScreen() {
         </View>
         <Text style={styles.stepTitle}>Stay in the loop</Text>
         <Text style={styles.stepDescription}>
-          Turn on notifications so you don't miss matches and messages.
+          Turn on notifications so you don&apos;t miss matches and messages.
         </Text>
       </View>
 

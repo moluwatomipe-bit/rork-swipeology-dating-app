@@ -289,7 +289,7 @@ export default function SwipeScreen() {
               end={{ x: 1, y: 1 }}
             >
               <Sparkles size={40} color="#fff" />
-              <Text style={styles.matchTitle}>It's a match!</Text>
+              <Text style={styles.matchTitle}>It&apos;s a match!</Text>
               <Text style={styles.matchSubtext}>
                 {activeTab === 'friends'
                   ? `You and ${matchPopup?.user.first_name} want to be friends!`
