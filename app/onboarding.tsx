@@ -27,6 +27,10 @@ import {
   ArrowLeft,
   Check,
   X,
+  Lock,
+  Eye,
+  EyeOff,
+  Mail,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -43,7 +47,7 @@ type DatingPrefOption = 'men' | 'women' | 'both';
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const { onboardingStep, goToStep, updateUser } = useAuth();
+  const { onboardingStep, goToStep, updateUser, login, completeRegistration, currentUser, isLoggingIn } = useAuth();
   const { requestPermissions } = useNotifications();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -62,6 +66,12 @@ export default function OnboardingScreen() {
   const [classYear, setClassYear] = useState<string>('');
   const [interests, setInterests] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [loginEmail, setLoginEmail] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+  const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
 
   const animateTransition = useCallback((nextStep: OnboardingStep) => {
     Animated.timing(fadeAnim, {
@@ -164,7 +174,7 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
-            animateTransition('phone-login');
+            animateTransition('login');
           }}
           activeOpacity={0.7}
           testID="login-btn"
@@ -282,7 +292,7 @@ export default function OnboardingScreen() {
             university: 'East Stroudsburg University',
             is_verified_esu: true,
           } as User);
-          animateTransition('name-age');
+          animateTransition('create-password');
         }}
         activeOpacity={0.8}
         testID="verify-email-btn"
@@ -297,6 +307,194 @@ export default function OnboardingScreen() {
         </LinearGradient>
       </TouchableOpacity>
     </ScrollView>
+  );
+
+  const renderLogin = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
+          <Mail size={28} color={theme.primary} />
+        </View>
+        <Text style={styles.stepTitle}>Welcome back</Text>
+        <Text style={styles.stepDescription}>
+          Log in with your ESU email and password
+        </Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>School email</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="yourname@live.esu.edu"
+          placeholderTextColor={theme.textMuted}
+          value={loginEmail}
+          onChangeText={setLoginEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          testID="login-email-input"
+        />
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Password</Text>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Enter your password"
+            placeholderTextColor={theme.textMuted}
+            value={loginPassword}
+            onChangeText={setLoginPassword}
+            secureTextEntry={!showLoginPassword}
+            testID="login-password-input"
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowLoginPassword(!showLoginPassword)}
+            activeOpacity={0.7}
+          >
+            {showLoginPassword ? (
+              <EyeOff size={20} color={theme.textMuted} />
+            ) : (
+              <Eye size={20} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
+        onPress={async () => {
+          if (!loginEmail.trim()) {
+            setError('Please enter your email');
+            return;
+          }
+          if (!loginPassword.trim()) {
+            setError('Please enter your password');
+            return;
+          }
+          setError('');
+          try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await login(loginEmail, loginPassword);
+            router.replace('/(tabs)/swipe');
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Login failed. Please try again.';
+            setError(msg);
+          }
+        }}
+        activeOpacity={0.8}
+        disabled={isLoggingIn}
+        testID="login-submit-btn"
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.primaryButtonText}>
+            {isLoggingIn ? 'Logging in...' : 'Log In'}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => {
+          setError('');
+          animateTransition('phone-login');
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.secondaryButtonText}>Create an account</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderCreatePassword = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
+          <Lock size={28} color={theme.primary} />
+        </View>
+        <Text style={styles.stepTitle}>Create a password</Text>
+        <Text style={styles.stepDescription}>
+          You&apos;ll use this to log back in
+        </Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Password</Text>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="At least 6 characters"
+            placeholderTextColor={theme.textMuted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            testID="password-input"
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword(!showPassword)}
+            activeOpacity={0.7}
+          >
+            {showPassword ? (
+              <EyeOff size={20} color={theme.textMuted} />
+            ) : (
+              <Eye size={20} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Confirm password</Text>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Re-enter your password"
+            placeholderTextColor={theme.textMuted}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={!showPassword}
+            testID="confirm-password-input"
+          />
+        </View>
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => {
+          if (password.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+          }
+          if (password !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+          }
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          updateUser({ password } as User);
+          animateTransition('name-age');
+        }}
+        activeOpacity={0.8}
+        testID="password-continue-btn"
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.primaryButtonText}>Continue</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
   );
 
   const renderNameAge = () => (
@@ -837,8 +1035,11 @@ export default function OnboardingScreen() {
 
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => {
+        onPress={async () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          if (currentUser) {
+            await completeRegistration(currentUser);
+          }
           goToStep('complete');
           router.replace('/(tabs)/swipe');
         }}
@@ -863,8 +1064,10 @@ export default function OnboardingScreen() {
   const renderStep = () => {
     switch (onboardingStep) {
       case 'welcome': return renderWelcome();
+      case 'login': return renderLogin();
       case 'phone-login': return renderPhoneLogin();
       case 'esu-email': return renderEsuEmail();
+      case 'create-password': return renderCreatePassword();
       case 'name-age': return renderNameAge();
       case 'gender': return renderGender();
       case 'dating-preference': return renderDatingPreference();
@@ -878,8 +1081,10 @@ export default function OnboardingScreen() {
   };
 
   const stepMap: Record<string, OnboardingStep> = {
+    'login': 'welcome',
     'esu-email': 'phone-login',
-    'name-age': 'esu-email',
+    'create-password': 'esu-email',
+    'name-age': 'create-password',
     'gender': 'name-age',
     'dating-preference': 'gender',
     'intent': 'dating-preference',
@@ -911,16 +1116,16 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         )}
 
-        {onboardingStep !== 'welcome' && (
+        {onboardingStep !== 'welcome' && onboardingStep !== 'login' && (
           <View style={styles.progressContainer}>
-            {['phone-login', 'esu-email', 'name-age', 'gender', 'dating-preference', 'intent', 'photos', 'bio-details', 'notifications', 'tutorial'].map((step, i) => (
+            {['phone-login', 'esu-email', 'create-password', 'name-age', 'gender', 'dating-preference', 'intent', 'photos', 'bio-details', 'notifications', 'tutorial'].map((step, i) => (
               <View
                 key={step}
                 style={[
                   styles.progressDot,
                   {
                     backgroundColor:
-                      ['phone-login', 'esu-email', 'name-age', 'gender', 'dating-preference', 'intent', 'photos', 'bio-details', 'notifications', 'tutorial'].indexOf(onboardingStep) >= i
+                      ['phone-login', 'esu-email', 'create-password', 'name-age', 'gender', 'dating-preference', 'intent', 'photos', 'bio-details', 'notifications', 'tutorial'].indexOf(onboardingStep) >= i
                         ? theme.primary
                         : theme.border,
                   },
@@ -1100,6 +1305,25 @@ const styles = StyleSheet.create({
     color: theme.text,
     borderWidth: 1,
     borderColor: theme.border,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.inputBg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: theme.text,
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 16,
   },
   textArea: {
     minHeight: 100,

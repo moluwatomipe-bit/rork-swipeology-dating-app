@@ -2,6 +2,7 @@ export interface User {
   id: string;
   phone_number: string;
   school_email: string;
+  password: string;
   university: string;
   is_verified_esu: boolean;
   first_name: string;
@@ -58,8 +59,10 @@ export interface Report {
 
 export type OnboardingStep =
   | 'welcome'
+  | 'login'
   | 'phone-login'
   | 'esu-email'
+  | 'create-password'
   | 'name-age'
   | 'gender'
   | 'dating-preference'

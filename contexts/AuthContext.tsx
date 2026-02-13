@@ -6,6 +6,13 @@ import { User, OnboardingStep } from '@/types';
 
 const STORAGE_KEY_USER = '@swipeology_user';
 const STORAGE_KEY_ONBOARDING = '@swipeology_onboarding';
+const STORAGE_KEY_ACCOUNTS = '@swipeology_accounts';
+
+interface StoredAccount {
+  email: string;
+  password: string;
+  user: User;
+}
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -56,6 +63,21 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  const registerAccountMutation = useMutation({
+    mutationFn: async (account: StoredAccount) => {
+      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
+      const idx = accounts.findIndex((a) => a.email.toLowerCase() === account.email.toLowerCase());
+      if (idx >= 0) {
+        accounts[idx] = account;
+      } else {
+        accounts.push(account);
+      }
+      await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+      return account;
+    },
+  });
+
   const { mutate: saveUser } = saveUserMutation;
 
   const updateUser = useCallback((updates: Partial<User>) => {
@@ -71,8 +93,55 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     saveStep(step);
   }, [saveStep]);
 
+  const { mutateAsync: registerAccount } = registerAccountMutation;
+
+  const completeRegistration = useCallback(async (user: User) => {
+    if (user.school_email && user.password) {
+      await registerAccount({
+        email: user.school_email.toLowerCase(),
+        password: user.password,
+        user,
+      });
+      console.log('Account registered for:', user.school_email);
+    }
+  }, [registerAccount]);
+
+  const loginMutation = useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
+      const account = accounts.find(
+        (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
+      );
+      if (!account) {
+        throw new Error('Invalid email or password. Please try again.');
+      }
+      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(account.user));
+      await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
+      return account.user;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      setOnboardingStep('complete');
+      queryClient.invalidateQueries({ queryKey: ['auth', 'stored'] });
+    },
+  });
+
+  const { mutateAsync: doLogin } = loginMutation;
+
+  const login = useCallback(async (email: string, password: string) => {
+    return doLogin({ email, password });
+  }, [doLogin]);
+
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
+      const email = currentUser?.school_email?.toLowerCase();
+      if (email) {
+        const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+        const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
+        const filtered = accounts.filter((a) => a.email.toLowerCase() !== email);
+        await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(filtered));
+      }
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING, '@swipeology_swipes', '@swipeology_matches', '@swipeology_messages']);
     },
     onSuccess: () => {
@@ -84,6 +153,17 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      if (currentUser?.school_email && currentUser?.password) {
+        const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+        const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
+        const idx = accounts.findIndex(
+          (a) => a.email.toLowerCase() === currentUser.school_email.toLowerCase()
+        );
+        if (idx >= 0) {
+          accounts[idx].user = currentUser;
+          await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+        }
+      }
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING]);
     },
     onSuccess: () => {
@@ -113,6 +193,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     goToStep,
     logout,
     deleteAccount,
+    login,
+    completeRegistration,
+    isLoggingIn: loginMutation.isPending,
+    loginError: loginMutation.error?.message ?? null,
     isLoading: loadStoredData.isLoading,
   };
 });
