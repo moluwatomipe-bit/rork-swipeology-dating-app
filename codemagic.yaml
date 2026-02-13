@@ -27,6 +27,10 @@ workflows:
         script: |
           npx expo prebuild --clean --platform ios
 
+      - name: Apply provisioning profiles
+        script: |
+          xcode-project use-profiles
+
       - name: Build IPA
         script: |
           xcode-project build-ipa \
