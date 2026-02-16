@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.swipeology-dating-app"
+      "bundleIdentifier": "app.rork.swipeology-dating-app",
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
