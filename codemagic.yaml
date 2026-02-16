@@ -17,6 +17,8 @@ workflows:
         XCODE_SCHEME: "SwipeologyDatingApp"
       node: 20
       cocoapods: default
+      ios:
+        build_number: 2   
 
     scripts:
       - name: Install dependencies
