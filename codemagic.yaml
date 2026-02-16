@@ -18,9 +18,6 @@ workflows:
       node: 20
       cocoapods: default
 
-    xcode:
-      build_number: 2
-      
     scripts:
       - name: Install dependencies
         script: |
