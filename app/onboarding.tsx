@@ -92,6 +92,7 @@ export default function OnboardingScreen() {
   const [classYear, setClassYear] = useState('');
   const [interests, setInterests] = useState('');
 
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
 
   // Photo picker
@@ -320,8 +321,8 @@ export default function OnboardingScreen() {
           placeholder="(555) 123‑4567"
           placeholderTextColor={theme.textMuted}
           keyboardType="phone-pad"
-          value={''} // phone is optional and not stored in Supabase
-          onChangeText={() => {}}
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
         />
       </View>
 
