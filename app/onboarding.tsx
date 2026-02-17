@@ -183,9 +183,15 @@ export default function OnboardingScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
           try {
-            await login(loginEmail.trim(), loginPassword.trim());
-            goToStep('complete');
-            router.replace('/(tabs)/swipe' as any);
+            const loggedInUser = await login(loginEmail.trim(), loginPassword.trim());
+            if (loggedInUser) {
+              goToStep('complete');
+              router.replace('/(tabs)/swipe' as any);
+            } else {
+              setSchoolEmail(loginEmail.trim());
+              setPassword(loginPassword.trim());
+              animateTransition('name-age');
+            }
           } catch (loginErr: any) {
             setError(loginErr?.message || 'Invalid email or password');
             return;

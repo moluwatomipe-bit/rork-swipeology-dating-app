@@ -112,7 +112,24 @@ export default function ProfileScreen() {
       <View style={styles.screen}>
         <Stack.Screen options={{ title: 'Profile' }} />
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Please log in to view your profile.</Text>
+          <Text style={styles.emptyText}>Your profile isn't set up yet.</Text>
+          <TouchableOpacity
+            style={styles.setupButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.replace('/onboarding' as any);
+            }}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#A855F7', '#EC4899']}
+              style={styles.setupButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.setupButtonText}>Complete Profile</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -329,6 +346,22 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: theme.textSecondary,
+    marginBottom: 20,
+  },
+  setupButton: {
+    borderRadius: 14,
+    overflow: 'hidden' as const,
+  },
+  setupButtonGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center' as const,
+  },
+  setupButtonText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#fff',
   },
   profileHeader: {
     alignItems: 'center',
