@@ -223,7 +223,21 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       console.log('[Auth] Login success:', data.user?.id);
 
-      return null;
+      const profile = await fetchProfile(data.user.id);
+      if (profile) {
+        setCurrentUser(profile);
+        setHasProfile(true);
+        setOnboardingStep('complete');
+        await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
+        await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
+        console.log('[Auth] Login: profile found, skipping onboarding');
+        return { hasProfile: true };
+      }
+
+      setHasProfile(false);
+      setProfileChecked(true);
+      console.log('[Auth] Login: no profile, needs onboarding');
+      return { hasProfile: false };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'stored'] });

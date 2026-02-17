@@ -262,8 +262,8 @@ export default function OnboardingScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
           try {
-            const loggedInUser = await login(loginEmail.trim(), loginPassword.trim());
-            if (loggedInUser) {
+            const result = await login(loginEmail.trim(), loginPassword.trim());
+            if (result?.hasProfile) {
               goToStep('complete');
               router.replace('/(tabs)/swipe' as any);
             } else {
