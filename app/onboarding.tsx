@@ -373,42 +373,55 @@ export default function OnboardingScreen() {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
-        onPress={async () => {
-          if (!loginEmail.trim()) {
-            setError('Please enter your email');
-            return;
-          }
-          if (!loginPassword.trim()) {
-            setError('Please enter your password');
-            return;
-          }
-          setError('');
-          try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await login(loginEmail, loginPassword);
-            router.replace('/(tabs)/swipe');
-          } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : 'Login failed. Please try again.';
-            setError(msg);
-          }
-        }}
-        activeOpacity={0.8}
-        disabled={isLoggingIn}
-        testID="login-submit-btn"
-      >
-        <LinearGradient
-          colors={['#A855F7', '#EC4899']}
-          style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isLoggingIn ? 'Logging in...' : 'Log In'}
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
+      <<TouchableOpacity
+  style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
+  onPress={async () => {
+    if (!loginEmail.trim()) {
+      setError('Please enter your email');
+      return;
+    }
+    if (!loginPassword.trim()) {
+      setError('Please enter your password');
+      return;
+    }
+
+    setError('');
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const { data, error: supaError } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword.trim(),
+      });
+
+      if (supaError) {
+        setError(supaError.message);
+        return;
+      }
+
+      router.replace('/(tabs)/swipe');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Login failed. Please try again.';
+      setError(msg);
+    }
+  }}
+  activeOpacity={0.8}
+  disabled={isLoggingIn}
+  testID="login-submit-btn"
+>
+  <LinearGradient
+    colors={['#A855F7', '#EC4899']}
+    style={styles.buttonGradient}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 0 }}
+  >
+    <Text style={styles.primaryButtonText}>
+      {isLoggingIn ? 'Logging in...' : 'Log In'}
+    </Text>
+  </LinearGradient>
+</TouchableOpacity>
+
 
       <TouchableOpacity
         onPress={() => {
