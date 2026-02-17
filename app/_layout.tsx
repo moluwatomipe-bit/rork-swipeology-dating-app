@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
+
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
