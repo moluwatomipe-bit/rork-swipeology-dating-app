@@ -1143,246 +1143,244 @@ export default function OnboardingScreen() {
     </Animated.View>
   );
 }
-
 const styles = StyleSheet.create({
   stepContainer: {
     flex: 1,
-    paddingHorizontal: 28,
-    justifyContent: 'center',
-    backgroundColor: theme.background,
-  },
-  scrollStep: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  scrollContent: {
-    paddingHorizontal: 28,
-    paddingBottom: 40,
+    paddingHorizontal: 24,
     paddingTop: 20,
   },
+
   stepHeader: {
+    marginBottom: 24,
     alignItems: 'center',
-    marginBottom: 32,
   },
+
   stepIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
+
   stepTitle: {
-    fontSize: 28,
-    fontWeight: '700' as const,
-    color: theme.text,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
+
   stepDescription: {
     fontSize: 15,
-    color: theme.textSecondary,
+    color: '#aaa',
     textAlign: 'center',
-    lineHeight: 22,
   },
+
   inputGroup: {
-    marginBottom: 18,
+    marginBottom: 20,
   },
+
   inputLabel: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: theme.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
+    color: '#ccc',
+    marginBottom: 6,
+    fontSize: 14,
   },
+
   textInput: {
-    backgroundColor: theme.inputBg,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    padding: 14,
+    color: '#fff',
     fontSize: 16,
-    color: theme.text,
-    borderWidth: 1,
-    borderColor: theme.border,
   },
+
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.inputBg,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    paddingHorizontal: 14,
   },
+
   passwordInput: {
     flex: 1,
-    paddingHorizontal: 16,
     paddingVertical: 14,
+    color: '#fff',
     fontSize: 16,
-    color: theme.text,
   },
+
   eyeButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    padding: 8,
   },
-  errorText: {
-    color: theme.error,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
+
   primaryButton: {
-    borderRadius: 14,
-    overflow: 'hidden' as const,
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
+
   buttonGradient: {
-    paddingVertical: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
   },
+
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 17,
-    fontWeight: '700' as const,
+    fontWeight: '600',
   },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
+
   secondaryButtonText: {
-    color: theme.primary,
+    color: '#aaa',
     fontSize: 15,
-    fontWeight: '600' as const,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 14,
   },
+
   forgotPasswordText: {
-    color: theme.textSecondary,
-    fontSize: 14,
+    color: '#aaa',
+    fontSize: 15,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 14,
   },
+
+  errorText: {
+    color: '#ff6b6b',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+
   optionsContainer: {
-    marginBottom: 16,
-    gap: 10,
+    marginTop: 20,
   },
+
   optionButton: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#1a1a1a',
+    marginBottom: 12,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.surface,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderWidth: 1.5,
-    borderColor: theme.border,
+    alignItems: 'center',
   },
+
   optionButtonSelected: {
-    borderColor: theme.primary,
-    backgroundColor: theme.card,
+    backgroundColor: '#A855F720',
+    borderColor: '#A855F7',
+    borderWidth: 1,
   },
+
   optionText: {
+    color: '#ccc',
     fontSize: 16,
-    color: theme.textSecondary,
-    fontWeight: '500' as const,
   },
+
   optionTextSelected: {
-    color: theme.text,
-    fontWeight: '600' as const,
+    color: '#fff',
+    fontWeight: '600',
   },
+
   toggleButton: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#1a1a1a',
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.surface,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    gap: 12,
   },
+
   toggleButtonActive: {
-    borderColor: theme.primary,
-    backgroundColor: theme.card,
+    backgroundColor: '#A855F720',
+    borderColor: '#A855F7',
+    borderWidth: 1,
   },
+
   toggleText: {
     flex: 1,
+    marginLeft: 12,
+    color: '#ccc',
     fontSize: 16,
-    color: theme.textSecondary,
-    fontWeight: '500' as const,
   },
+
   toggleTextActive: {
-    color: theme.text,
-    fontWeight: '600' as const,
+    color: '#fff',
+    fontWeight: '600',
   },
+
   toggleCheck: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleCheckActive: {
-    backgroundColor: theme.primary,
-    borderColor: theme.primary,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 20,
-  },
-  photoBox: {
-    width: (SCREEN_WIDTH - 56 - 20) / 3,
-    aspectRatio: 3 / 4,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.surface,
-  },
-  photoBoxFilled: {
-    borderStyle: 'solid',
-    borderColor: theme.primary,
-  },
-  photoPreview: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.card,
-  },
-  photoPreviewText: {
-    color: theme.textSecondary,
-    fontSize: 12,
-  },
-  photoRemove: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#555',
     justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  toggleCheckActive: {
+    backgroundColor: '#A855F7',
+    borderColor: '#A855F7',
+  },
+
+  scrollStep: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+
+  photoBox: {
+    width: '48%',
+    height: 160,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginBottom: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  photoBoxFilled: {
+    backgroundColor: '#333',
+  },
+
   photoPlaceholder: {
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    alignItems: 'center',
   },
+
   photoPlaceholderText: {
-    color: theme.textMuted,
-    fontSize: 12,
-    fontWeight: '600' as const,
+    color: '#aaa',
+    marginTop: 6,
+  },
+
+  photoPreview: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  photoPreviewText: {
+    color: '#fff',
+    marginBottom: 6,
+  },
+
+  photoRemove: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#0008',
+    padding: 4,
+    borderRadius: 8,
   },
 });
+
