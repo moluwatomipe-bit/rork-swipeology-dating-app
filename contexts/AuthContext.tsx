@@ -273,7 +273,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
-      console.log('[Auth] Deleting account');
+      console.log('[Auth] Deleting account from Supabase Auth and local storage');
+      const { error } = await supabase.rpc('delete_user');
+      if (error) {
+        console.log('[Auth] Supabase delete_user RPC error:', error.message);
+      } else {
+        console.log('[Auth] User deleted from Supabase Auth');
+      }
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING, '@swipeology_swipes', '@swipeology_matches', '@swipeology_messages']);
       await supabase.auth.signOut();
     },
