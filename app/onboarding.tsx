@@ -25,7 +25,6 @@ import {
   Camera,
   Bell,
   Sparkles,
-  ArrowLeft,
   Check,
   X,
   Lock,
@@ -48,12 +47,10 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  // Auth functions
   const { login, signUp, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser, isLoggingIn, isSigningUp } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Step navigation
-  const [onboardingStep, setOnboardingStep] = useState<'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('login');
+  const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('welcome');
 
   const animateTransition = (next: typeof onboardingStep) => {
     Animated.timing(fadeAnim, {
@@ -70,7 +67,6 @@ export default function OnboardingScreen() {
     });
   };
 
-  // Form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -96,7 +92,6 @@ export default function OnboardingScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
 
-  // Photo picker
   const handlePickPhoto = async (index: number) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -111,9 +106,93 @@ export default function OnboardingScreen() {
       setPhotos(updated);
     }
   };
-  // -----------------------------
-  // LOGIN SCREEN
-  // -----------------------------
+
+  const renderWelcome = () => (
+    <View style={welcomeStyles.container}>
+      <View style={welcomeStyles.content}>
+        <View style={welcomeStyles.heroSection}>
+          <View style={welcomeStyles.heartCircle}>
+            <LinearGradient
+              colors={['#C084FC', '#E879F9']}
+              style={welcomeStyles.heartGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Heart size={36} color="#FDE68A" fill="#FDE68A" />
+            </LinearGradient>
+          </View>
+
+          <Text style={welcomeStyles.appName}>Swipeology</Text>
+          <Text style={welcomeStyles.tagline}>
+            Meet friends and date safely with{'\n'}students from your university.
+          </Text>
+        </View>
+
+        <View style={welcomeStyles.features}>
+          <View style={welcomeStyles.featureRow}>
+            <View style={[welcomeStyles.featureIcon, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
+              <Shield size={18} color="#A855F7" />
+            </View>
+            <Text style={welcomeStyles.featureText}>
+              Only confirmed students from East{'\n'}Stroudsburg University
+            </Text>
+          </View>
+
+          <View style={welcomeStyles.featureRow}>
+            <View style={[welcomeStyles.featureIcon, { backgroundColor: 'rgba(236, 72, 153, 0.15)' }]}>
+              <Users size={18} color="#EC4899" />
+            </View>
+            <Text style={welcomeStyles.featureText}>
+              Friends and Dating sections in one{'\n'}app
+            </Text>
+          </View>
+
+          <View style={welcomeStyles.featureRow}>
+            <View style={[welcomeStyles.featureIcon, { backgroundColor: 'rgba(168, 85, 247, 0.1)' }]}>
+              <Sparkles size={18} color="#C084FC" />
+            </View>
+            <Text style={welcomeStyles.featureText}>
+              Swipe to match, then chat
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={welcomeStyles.bottomSection}>
+        <TouchableOpacity
+          style={welcomeStyles.getStartedBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            animateTransition('phone-login');
+          }}
+          activeOpacity={0.85}
+          testID="get-started-btn"
+        >
+          <LinearGradient
+            colors={['#EC4899', '#D946EF']}
+            style={welcomeStyles.getStartedGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Text style={welcomeStyles.getStartedText}>Get Started</Text>
+            <ChevronRight size={20} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            animateTransition('login');
+          }}
+          activeOpacity={0.7}
+          testID="login-btn"
+        >
+          <Text style={welcomeStyles.loginText}>Log In</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const renderLogin = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -231,9 +310,6 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  // -----------------------------
-  // FORGOT PASSWORD (SUPABASE EMAIL RESET)
-  // -----------------------------
   const renderForgotPassword = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -242,7 +318,7 @@ export default function OnboardingScreen() {
         </View>
         <Text style={styles.stepTitle}>Reset password</Text>
         <Text style={styles.stepDescription}>
-          Enter your ESU email and we’ll send a reset link
+          Enter your ESU email and we'll send a reset link
         </Text>
       </View>
 
@@ -310,16 +386,14 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
     </View>
   );
-  // -----------------------------
-  // PHONE LOGIN (FIRST SIGNUP STEP)
-  // -----------------------------
+
   const renderPhoneLogin = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
         <View style={[styles.stepIconCircle, { backgroundColor: '#EC489920' }]}>
           <Phone size={28} color={theme.secondary} />
         </View>
-        <Text style={styles.stepTitle}>Let’s get started</Text>
+        <Text style={styles.stepTitle}>Let's get started</Text>
         <Text style={styles.stepDescription}>
           Enter your phone number (optional)
         </Text>
@@ -356,17 +430,14 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => animateTransition('login')}
+        onPress={() => animateTransition('welcome')}
         activeOpacity={0.7}
       >
-        <Text style={styles.secondaryButtonText}>Back to login</Text>
+        <Text style={styles.secondaryButtonText}>Back</Text>
       </TouchableOpacity>
     </View>
   );
 
-  // -----------------------------
-  // ESU EMAIL STEP
-  // -----------------------------
   const renderEsuEmail = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -432,9 +503,6 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  // -----------------------------
-  // CREATE PASSWORD (SUPABASE SIGNUP)
-  // -----------------------------
   const renderCreatePassword = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -443,7 +511,7 @@ export default function OnboardingScreen() {
         </View>
         <Text style={styles.stepTitle}>Create a password</Text>
         <Text style={styles.stepDescription}>
-          You’ll use this to log back in
+          You'll use this to log back in
         </Text>
       </View>
 
@@ -537,9 +605,7 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
     </View>
   );
-  // -----------------------------
-  // NAME + AGE
-  // -----------------------------
+
   const renderNameAge = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -609,9 +675,6 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  // -----------------------------
-  // GENDER
-  // -----------------------------
   const renderGender = () => {
     const options: { label: string; value: GenderOption }[] = [
       { label: 'Man', value: 'man' },
@@ -623,7 +686,7 @@ export default function OnboardingScreen() {
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepHeader}>
-          <Text style={styles.stepTitle}>What’s your gender?</Text>
+          <Text style={styles.stepTitle}>What's your gender?</Text>
         </View>
 
         <View style={styles.optionsContainer}>
@@ -681,9 +744,6 @@ export default function OnboardingScreen() {
     );
   };
 
-  // -----------------------------
-  // DATING PREFERENCE
-  // -----------------------------
   const renderDatingPreference = () => {
     const options: { label: string; value: DatingPrefOption }[] = [
       { label: 'Men', value: 'men' },
@@ -752,9 +812,6 @@ export default function OnboardingScreen() {
     );
   };
 
-  // -----------------------------
-  // INTENT (FRIENDS / DATING)
-  // -----------------------------
   const renderIntent = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -824,9 +881,7 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
     </View>
   );
-  // -----------------------------
-  // PHOTOS
-  // -----------------------------
+
   const renderPhotos = () => (
     <ScrollView style={styles.scrollStep} contentContainerStyle={styles.scrollContent}>
       <View style={styles.stepHeader}>
@@ -885,9 +940,6 @@ export default function OnboardingScreen() {
     </ScrollView>
   );
 
-  // -----------------------------
-  // BIO DETAILS
-  // -----------------------------
   const renderBioDetails = () => (
     <ScrollView style={styles.scrollStep} contentContainerStyle={styles.scrollContent}>
       <View style={styles.stepHeader}>
@@ -973,9 +1025,6 @@ export default function OnboardingScreen() {
     </ScrollView>
   );
 
-  // -----------------------------
-  // NOTIFICATIONS
-  // -----------------------------
   const renderNotifications = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -1011,16 +1060,13 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  // -----------------------------
-  // TUTORIAL
-  // -----------------------------
   const renderTutorial = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
         <Sparkles size={28} color={theme.primary} />
         <Text style={styles.stepTitle}>How Swipeology works</Text>
         <Text style={styles.stepDescription}>
-          Swipe right to like, left to pass. If you both like each other, it’s a match!
+          Swipe right to like, left to pass. If you both like each other, it's a match!
         </Text>
       </View>
 
@@ -1041,9 +1087,7 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
     </View>
   );
-  // -----------------------------
-  // FINAL SUBMIT — SAVE PROFILE TO SUPABASE
-  // -----------------------------
+
   const renderFinalSubmit = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -1110,8 +1154,10 @@ export default function OnboardingScreen() {
       </TouchableOpacity>
     </View>
   );
+
   const renderStep = () => {
     switch (onboardingStep) {
+      case 'welcome': return renderWelcome();
       case 'login': return renderLogin();
       case 'forgot-password': return renderForgotPassword();
       case 'phone-login': return renderPhoneLogin();
@@ -1126,27 +1172,124 @@ export default function OnboardingScreen() {
       case 'notifications': return renderNotifications();
       case 'tutorial': return renderTutorial();
       case 'final-submit': return renderFinalSubmit();
-      default: return renderLogin();
+      default: return renderWelcome();
     }
   };
+
   return (
-    <Animated.View style={{ flex: 1, opacity: fadeAnim, paddingTop: insets.top }}>
-      {renderStep()}
-    </Animated.View>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <Animated.View style={{ flex: 1, opacity: fadeAnim, paddingTop: insets.top }}>
+        {renderStep()}
+      </Animated.View>
+    </View>
   );
 }
+
+const welcomeStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  heartCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  heartGradient: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appName: {
+    fontSize: 36,
+    fontWeight: '800' as const,
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#C4A8D8',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  features: {
+    width: '100%',
+    gap: 16,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  featureIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featureText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#E2D1F0',
+    fontWeight: '500' as const,
+    lineHeight: 22,
+  },
+  bottomSection: {
+    paddingBottom: 40,
+    gap: 16,
+    alignItems: 'center',
+  },
+  getStartedBtn: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  getStartedGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 6,
+  },
+  getStartedText: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  loginText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#C4A8D8',
+  },
+});
+
 const styles = StyleSheet.create({
   stepContainer: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
   },
-
   stepHeader: {
     marginBottom: 24,
     alignItems: 'center',
   },
-
   stepIconCircle: {
     width: 60,
     height: 60,
@@ -1155,153 +1298,135 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-
   stepTitle: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '700' as const,
     color: '#fff',
     textAlign: 'center',
     marginBottom: 6,
   },
-
   stepDescription: {
     fontSize: 15,
     color: '#aaa',
     textAlign: 'center',
   },
-
   inputGroup: {
     marginBottom: 20,
   },
-
   inputLabel: {
     color: '#ccc',
     marginBottom: 6,
     fontSize: 14,
   },
-
   textInput: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#1C1228',
     borderRadius: 10,
     padding: 14,
     color: '#fff',
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#3A2550',
   },
-
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#1C1228',
     borderRadius: 10,
     paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#3A2550',
   },
-
   passwordInput: {
     flex: 1,
     paddingVertical: 14,
     color: '#fff',
     fontSize: 16,
   },
-
   eyeButton: {
     padding: 8,
   },
-
   primaryButton: {
     marginTop: 10,
     borderRadius: 12,
     overflow: 'hidden',
   },
-
   buttonGradient: {
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
-
   primaryButtonText: {
     color: '#fff',
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '600' as const,
   },
-
   secondaryButtonText: {
     color: '#aaa',
     fontSize: 15,
     textAlign: 'center',
     marginTop: 14,
   },
-
   forgotPasswordText: {
     color: '#aaa',
     fontSize: 15,
     textAlign: 'center',
     marginTop: 14,
   },
-
   errorText: {
     color: '#ff6b6b',
     marginBottom: 10,
     textAlign: 'center',
   },
-
   optionsContainer: {
     marginTop: 20,
   },
-
   optionButton: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#1C1228',
     marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3A2550',
   },
-
   optionButtonSelected: {
     backgroundColor: '#A855F720',
     borderColor: '#A855F7',
-    borderWidth: 1,
   },
-
   optionText: {
     color: '#ccc',
     fontSize: 16,
   },
-
   optionTextSelected: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '600' as const,
   },
-
   toggleButton: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#1C1228',
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3A2550',
   },
-
   toggleButtonActive: {
     backgroundColor: '#A855F720',
     borderColor: '#A855F7',
-    borderWidth: 1,
   },
-
   toggleText: {
     flex: 1,
     marginLeft: 12,
     color: '#ccc',
     fontSize: 16,
   },
-
   toggleTextActive: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '600' as const,
   },
-
   toggleCheck: {
     width: 22,
     height: 22,
@@ -1311,61 +1436,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   toggleCheckActive: {
     backgroundColor: '#A855F7',
     borderColor: '#A855F7',
   },
-
   scrollStep: {
     flex: 1,
   },
-
   scrollContent: {
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
-
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-
   photoBox: {
     width: '48%',
     height: 160,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#1C1228',
     borderRadius: 12,
     marginBottom: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3A2550',
   },
-
   photoBoxFilled: {
-    backgroundColor: '#333',
+    backgroundColor: '#2E1E45',
   },
-
   photoPlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   photoPlaceholderText: {
     color: '#aaa',
     marginTop: 6,
   },
-
   photoPreview: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   photoPreviewText: {
     color: '#fff',
     marginBottom: 6,
   },
-
   photoRemove: {
     position: 'absolute',
     top: 8,
@@ -1374,9 +1490,7 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 8,
   },
-
   buttonDisabled: {
     opacity: 0.5,
   },
 });
-

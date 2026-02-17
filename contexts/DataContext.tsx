@@ -1,10 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Swipe, Match, Message, User } from '@/types';
 import { MOCK_USERS } from '@/mocks/users';
 import { useAuth } from './AuthContext';
+import {
+  createMatch as createMatchSupabase,
+  fetchMatchesForUser,
+  fetchMessagesForMatch,
+  sendMessageToMatch,
+  createSwipeRecord,
+  checkMutualSwipe,
+  deleteMatchRecord,
+  subscribeToMatches,
+} from '@/lib/supabase-matches';
 
 const STORAGE_SWIPES = '@swipeology_swipes';
 const STORAGE_MATCHES = '@swipeology_matches';
@@ -12,6 +22,7 @@ const STORAGE_MESSAGES = '@swipeology_messages';
 
 export const [DataProvider, useData] = createContextHook(() => {
   const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
 
   const [swipes, setSwipes] = useState<Swipe[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -26,11 +37,21 @@ export const [DataProvider, useData] = createContextHook(() => {
   });
 
   const matchesQuery = useQuery({
-    queryKey: ['matches'],
+    queryKey: ['matches', currentUser?.id],
     queryFn: async () => {
+      if (!currentUser) return [];
+      try {
+        const supaMatches = await fetchMatchesForUser(currentUser.id);
+        if (supaMatches.length > 0) {
+          return supaMatches;
+        }
+      } catch (e) {
+        console.log('[Data] Supabase matches fetch failed, falling back to local:', e);
+      }
       const stored = await AsyncStorage.getItem(STORAGE_MATCHES);
       return stored ? (JSON.parse(stored) as Match[]) : [];
     },
+    enabled: !!currentUser,
   });
 
   const messagesQuery = useQuery({
@@ -53,10 +74,29 @@ export const [DataProvider, useData] = createContextHook(() => {
     if (messagesQuery.data) setMessages(messagesQuery.data);
   }, [messagesQuery.data]);
 
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const unsubscribe = subscribeToMatches(currentUser.id, (newMatch) => {
+      setMatches((prev) => {
+        if (prev.find((m) => m.id === newMatch.id)) return prev;
+        return [newMatch, ...prev];
+      });
+      queryClient.invalidateQueries({ queryKey: ['matches', currentUser.id] });
+    });
+
+    return unsubscribe;
+  }, [currentUser?.id, queryClient]);
+
   const addSwipeMutation = useMutation({
     mutationFn: async (swipe: Swipe) => {
       const updated = [...swipes, swipe];
       await AsyncStorage.setItem(STORAGE_SWIPES, JSON.stringify(updated));
+      try {
+        await createSwipeRecord(swipe.user_from, swipe.user_to, swipe.context, swipe.liked);
+      } catch (e) {
+        console.log('[Data] Supabase swipe record failed:', e);
+      }
       return { swipe, updated };
     },
     onSuccess: ({ updated }) => {
@@ -81,11 +121,14 @@ export const [DataProvider, useData] = createContextHook(() => {
       await AsyncStorage.setItem(STORAGE_MESSAGES, JSON.stringify(updated));
       return updated;
     },
+    onSuccess: (updated) => {
+      setMessages(updated);
+    },
   });
 
   const { mutate: addMessageMutate } = addMessageMutation;
 
-  const sendMessage = useCallback((matchId: string, text: string) => {
+  const sendMessage = useCallback(async (matchId: string, text: string) => {
     if (!currentUser) return;
     const msg: Message = {
       id: `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
@@ -96,12 +139,18 @@ export const [DataProvider, useData] = createContextHook(() => {
     };
     setMessages((prev) => [...prev, msg]);
     addMessageMutate(msg);
+
+    try {
+      await sendMessageToMatch(matchId, currentUser.id, text);
+    } catch (e) {
+      console.log('[Data] Supabase send message failed:', e);
+    }
   }, [currentUser, addMessageMutate]);
 
   const { mutate: addSwipeMutate } = addSwipeMutation;
   const { mutate: addMatchMutate } = addMatchMutation;
 
-  const performSwipe = useCallback((userId: string, context: 'friends' | 'dating', liked: boolean): Match | null => {
+  const performSwipe = useCallback(async (userId: string, context: 'friends' | 'dating', liked: boolean): Promise<Match | null> => {
     if (!currentUser) return null;
 
     const swipe: Swipe = {
@@ -118,49 +167,60 @@ export const [DataProvider, useData] = createContextHook(() => {
     addSwipeMutate(swipe);
 
     if (liked) {
-      const mutualSwipe = updatedSwipes.find(
-        (s) =>
-          s.user_from === userId &&
-          s.user_to === currentUser.id &&
-          s.context === context &&
-          s.liked === true
-      );
-
-      if (mutualSwipe) {
-        const match: Match = {
-          id: `match_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          user1: currentUser.id,
-          user2: userId,
-          context,
-          created_at: new Date().toISOString(),
-        };
-        const updatedMatches = [...matches, match];
-        setMatches(updatedMatches);
-        addMatchMutate(match);
-        return match;
+      let isMutual = false;
+      try {
+        isMutual = await checkMutualSwipe(currentUser.id, userId, context);
+      } catch (e) {
+        console.log('[Data] Mutual swipe check failed:', e);
       }
 
-      const shouldAutoMatch = Math.random() < 0.4;
-      if (shouldAutoMatch) {
-        const fakeSwipe: Swipe = {
-          id: `swipe_${Date.now()}_auto`,
-          user_from: userId,
-          user_to: currentUser.id,
-          context,
-          liked: true,
-          created_at: new Date().toISOString(),
-        };
-        const withFake = [...updatedSwipes, fakeSwipe];
-        setSwipes(withFake);
-        AsyncStorage.setItem(STORAGE_SWIPES, JSON.stringify(withFake));
+      if (!isMutual) {
+        const localMutual = updatedSwipes.find(
+          (s) =>
+            s.user_from === userId &&
+            s.user_to === currentUser.id &&
+            s.context === context &&
+            s.liked === true
+        );
+        isMutual = !!localMutual;
+      }
 
-        const match: Match = {
-          id: `match_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          user1: currentUser.id,
-          user2: userId,
-          context,
-          created_at: new Date().toISOString(),
-        };
+      if (!isMutual) {
+        const shouldAutoMatch = Math.random() < 0.4;
+        if (shouldAutoMatch) {
+          isMutual = true;
+          const fakeSwipe: Swipe = {
+            id: `swipe_${Date.now()}_auto`,
+            user_from: userId,
+            user_to: currentUser.id,
+            context,
+            liked: true,
+            created_at: new Date().toISOString(),
+          };
+          const withFake = [...updatedSwipes, fakeSwipe];
+          setSwipes(withFake);
+          AsyncStorage.setItem(STORAGE_SWIPES, JSON.stringify(withFake));
+        }
+      }
+
+      if (isMutual) {
+        let match: Match | null = null;
+        try {
+          match = await createMatchSupabase(currentUser.id, userId, context);
+        } catch (e) {
+          console.log('[Data] Supabase match creation failed:', e);
+        }
+
+        if (!match) {
+          match = {
+            id: `match_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            user1: currentUser.id,
+            user2: userId,
+            context,
+            created_at: new Date().toISOString(),
+          };
+        }
+
         const updatedMatches = [...matches, match];
         setMatches(updatedMatches);
         addMatchMutate(match);
@@ -237,6 +297,11 @@ export const [DataProvider, useData] = createContextHook(() => {
     mutationFn: async (matchId: string) => {
       const updated = matches.filter((m) => m.id !== matchId);
       await AsyncStorage.setItem(STORAGE_MATCHES, JSON.stringify(updated));
+      try {
+        await deleteMatchRecord(matchId);
+      } catch (e) {
+        console.log('[Data] Supabase delete match failed:', e);
+      }
       return updated;
     },
     onSuccess: (updated) => {
@@ -250,6 +315,20 @@ export const [DataProvider, useData] = createContextHook(() => {
     removeMatchMutate(matchId);
   }, [removeMatchMutate]);
 
+  const loadMessagesForMatch = useCallback(async (matchId: string) => {
+    try {
+      const supaMessages = await fetchMessagesForMatch(matchId);
+      if (supaMessages.length > 0) {
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m.match_id !== matchId);
+          return [...filtered, ...supaMessages];
+        });
+      }
+    } catch (e) {
+      console.log('[Data] Load messages from Supabase failed:', e);
+    }
+  }, []);
+
   return {
     swipes,
     matches,
@@ -261,5 +340,6 @@ export const [DataProvider, useData] = createContextHook(() => {
     getMessagesForMatch,
     getOtherUserForMatch,
     removeMatch,
+    loadMessagesForMatch,
   };
 });

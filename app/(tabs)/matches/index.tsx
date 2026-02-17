@@ -17,7 +17,7 @@ import Colors from '@/constants/colors';
 const theme = Colors.dark;
 
 export default function MatchesScreen() {
-  const { getMatchesForContext } = useData();
+  const { getMatchesForContext, getMessagesForMatch } = useData();
   const [activeTab, setActiveTab] = useState<'friends' | 'dating'>('friends');
 
   const matchesWithUsers = useMemo(
@@ -38,6 +38,9 @@ export default function MatchesScreen() {
   }, []);
 
   const renderMatchItem = useCallback(({ item }: { item: Match & { otherUser: User } }) => {
+    const msgs = getMessagesForMatch(item.id);
+    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+
     return (
       <TouchableOpacity
         style={styles.matchItem}
@@ -52,24 +55,30 @@ export default function MatchesScreen() {
         />
         <View style={styles.matchInfo}>
           <Text style={styles.matchName}>{item.otherUser.first_name}</Text>
-          <View style={styles.matchContext}>
-            {item.context === 'friends' ? (
-              <Users size={12} color={theme.secondary} />
-            ) : (
-              <Heart size={12} color={theme.primary} />
-            )}
-            <Text style={[
-              styles.matchContextText,
-              { color: item.context === 'friends' ? theme.secondary : theme.primary }
-            ]}>
-              {item.context === 'friends' ? 'Friends match' : 'Dating match'}
+          {lastMsg ? (
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {lastMsg.message_text}
             </Text>
-          </View>
+          ) : (
+            <View style={styles.matchContext}>
+              {item.context === 'friends' ? (
+                <Users size={12} color={theme.secondary} />
+              ) : (
+                <Heart size={12} color={theme.primary} />
+              )}
+              <Text style={[
+                styles.matchContextText,
+                { color: item.context === 'friends' ? theme.secondary : theme.primary }
+              ]}>
+                {item.context === 'friends' ? 'Friends match' : 'Dating match'}
+              </Text>
+            </View>
+          )}
         </View>
         <ChevronRight size={20} color={theme.textMuted} />
       </TouchableOpacity>
     );
-  }, [handleOpenChat]);
+  }, [handleOpenChat, getMessagesForMatch]);
 
   return (
     <View style={styles.screen}>
@@ -194,6 +203,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600' as const,
     color: theme.text,
+  },
+  lastMessage: {
+    fontSize: 13,
+    color: theme.textSecondary,
   },
   matchContext: {
     flexDirection: 'row',

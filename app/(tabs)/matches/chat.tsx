@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Message } from '@/types';
+import { subscribeToMessages } from '@/lib/supabase-matches';
 import Colors from '@/constants/colors';
 
 const theme = Colors.dark;
@@ -27,24 +28,57 @@ export default function ChatScreen() {
     context: string;
   }>();
   const { currentUser, blockUser, reportUser } = useAuth();
-  const { getMessagesForMatch, sendMessage, getOtherUserForMatch, removeMatch } = useData();
+  const { getMessagesForMatch, sendMessage, getOtherUserForMatch, removeMatch, loadMessagesForMatch } = useData();
   const [inputText, setInputText] = useState<string>('');
   const flatListRef = useRef<FlatList<Message>>(null);
+  const [realtimeMessages, setRealtimeMessages] = useState<Message[]>([]);
 
   const otherUser = useMemo(
     () => getOtherUserForMatch(matchId || ''),
     [matchId, getOtherUserForMatch]
   );
 
-  const chatMessages = useMemo(
+  const localMessages = useMemo(
     () => getMessagesForMatch(matchId || ''),
     [matchId, getMessagesForMatch]
   );
+
+  const chatMessages = useMemo(() => {
+    const allMsgs = [...localMessages];
+    for (const rtMsg of realtimeMessages) {
+      if (!allMsgs.find((m) => m.id === rtMsg.id)) {
+        allMsgs.push(rtMsg);
+      }
+    }
+    return allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [localMessages, realtimeMessages]);
 
   const isBlocked = useMemo(() => {
     if (!currentUser || !otherUser) return false;
     return (currentUser.blocked_users || []).includes(otherUser.id);
   }, [currentUser, otherUser]);
+
+  useEffect(() => {
+    if (matchId) {
+      loadMessagesForMatch(matchId);
+    }
+  }, [matchId, loadMessagesForMatch]);
+
+  useEffect(() => {
+    if (!matchId) return;
+
+    const unsubscribe = subscribeToMessages(matchId, (newMessage) => {
+      console.log('[Chat] Real-time message received:', newMessage.id);
+      if (newMessage.sender_id !== currentUser?.id) {
+        setRealtimeMessages((prev) => {
+          if (prev.find((m) => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [matchId, currentUser?.id]);
 
   useEffect(() => {
     if (chatMessages.length > 0) {

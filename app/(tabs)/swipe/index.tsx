@@ -39,6 +39,7 @@ export default function SwipeScreen() {
   const [activeTab, setActiveTab] = useState<'friends' | 'dating'>('friends');
   const [cardIndex, setCardIndex] = useState<number>(0);
   const [matchPopup, setMatchPopup] = useState<{ match: Match; user: User } | null>(null);
+  const [isSwiping, setIsSwiping] = useState<boolean>(false);
 
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
@@ -69,10 +70,12 @@ export default function SwipeScreen() {
     }).start();
   }, [position]);
 
-  const swipeCard = useCallback((direction: 'left' | 'right') => {
-    if (!currentCard || !currentUser) return;
+  const swipeCard = useCallback(async (direction: 'left' | 'right') => {
+    if (!currentCard || !currentUser || isSwiping) return;
     const liked = direction === 'right';
     const toValue = direction === 'right' ? SCREEN_WIDTH + 100 : -SCREEN_WIDTH - 100;
+
+    setIsSwiping(true);
 
     Haptics.impactAsync(
       liked ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light
@@ -82,21 +85,26 @@ export default function SwipeScreen() {
       toValue: { x: toValue, y: 0 },
       duration: 300,
       useNativeDriver: false,
-    }).start(() => {
-      const result = performSwipe(currentCard.id, activeTab, liked);
-      if (result) {
-        setMatchPopup({ match: result, user: currentCard });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }).start(async () => {
+      try {
+        const result = await performSwipe(currentCard.id, activeTab, liked);
+        if (result) {
+          setMatchPopup({ match: result, user: currentCard });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } catch (e) {
+        console.log('[Swipe] Error performing swipe:', e);
       }
       position.setValue({ x: 0, y: 0 });
       setCardIndex((prev) => prev + 1);
+      setIsSwiping(false);
     });
-  }, [currentCard, currentUser, activeTab, performSwipe, position]);
+  }, [currentCard, currentUser, activeTab, performSwipe, position, isSwiping]);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => !isSwiping,
         onPanResponderMove: (_, gesture) => {
           position.setValue({ x: gesture.dx, y: gesture.dy * 0.3 });
         },
@@ -110,7 +118,7 @@ export default function SwipeScreen() {
           }
         },
       }),
-    [swipeCard, resetPosition, position]
+    [swipeCard, resetPosition, position, isSwiping]
   );
 
   const handleTabChange = useCallback((tab: 'friends' | 'dating') => {
@@ -260,6 +268,7 @@ export default function SwipeScreen() {
             onPress={() => swipeCard('left')}
             activeOpacity={0.8}
             testID="dislike-btn"
+            disabled={isSwiping}
           >
             <X size={28} color={theme.error} />
           </TouchableOpacity>
@@ -268,6 +277,7 @@ export default function SwipeScreen() {
             onPress={() => swipeCard('right')}
             activeOpacity={0.8}
             testID="like-btn"
+            disabled={isSwiping}
           >
             <Heart size={28} color="#fff" fill="#fff" />
           </TouchableOpacity>
