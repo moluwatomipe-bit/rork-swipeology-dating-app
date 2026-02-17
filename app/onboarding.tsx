@@ -1,3 +1,4 @@
+import { supabase } from '@/constants/supabase';
 import { useState, useRef, useCallback } from 'react';
 import {
   View,
