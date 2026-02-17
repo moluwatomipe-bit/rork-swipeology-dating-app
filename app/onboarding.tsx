@@ -1352,5 +1352,9 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 8,
   },
+
+  buttonDisabled: {
+    opacity: 0.5,
+  },
 });
 
