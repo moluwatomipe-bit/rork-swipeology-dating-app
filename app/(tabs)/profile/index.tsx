@@ -36,24 +36,24 @@ export default function ProfileScreen() {
 
   const handleEditProfile = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(tabs)/profile/edit');
+    router.push('/(tabs)/profile/edit' as any);
   }, []);
 
   const handleChangePassword = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!currentUser?.phone_verified) {
       router.push({
-        pathname: '/(tabs)/profile/verify-phone',
+        pathname: '/(tabs)/profile/verify-phone' as any,
         params: { redirect: 'password' },
       });
     } else {
-      router.push('/(tabs)/profile/change-password');
+      router.push('/(tabs)/profile/change-password' as any);
     }
   }, [currentUser]);
 
   const handlePreferences = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(tabs)/profile/preferences');
+    router.push('/(tabs)/profile/preferences' as any);
   }, []);
 
   const handleLogout = useCallback(() => {
@@ -68,7 +68,7 @@ export default function ProfileScreen() {
           onPress: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             logout();
-            router.replace('/onboarding');
+            router.replace('/onboarding' as any);
           },
         },
       ]
@@ -96,7 +96,7 @@ export default function ProfileScreen() {
                   onPress: () => {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                     deleteAccount();
-                    router.replace('/onboarding');
+                    router.replace('/onboarding' as any);
                   },
                 },
               ]
@@ -162,7 +162,7 @@ export default function ProfileScreen() {
           ) : (
             <TouchableOpacity
               style={styles.verifyPhoneBanner}
-              onPress={() => router.push('/(tabs)/profile/verify-phone')}
+              onPress={() => router.push('/(tabs)/profile/verify-phone' as any)}
               activeOpacity={0.7}
             >
               <Phone size={16} color={theme.warning} />

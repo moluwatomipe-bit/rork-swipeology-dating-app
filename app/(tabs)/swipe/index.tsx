@@ -302,7 +302,7 @@ export default function SwipeScreen() {
                   setMatchPopup(null);
                   if (m) {
                     router.push({
-                      pathname: '/(tabs)/matches/chat',
+                      pathname: '/(tabs)/matches/chat' as any,
                       params: {
                         matchId: m.match.id,
                         userName: m.user.first_name,

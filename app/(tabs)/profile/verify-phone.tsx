@@ -71,9 +71,9 @@ export default function VerifyPhoneScreen() {
           text: 'Continue',
           onPress: () => {
             if (redirect === 'edit') {
-              router.replace('/(tabs)/profile/edit');
+              router.replace('/(tabs)/profile/edit' as any);
             } else if (redirect === 'password') {
-              router.replace('/(tabs)/profile/change-password');
+              router.replace('/(tabs)/profile/change-password' as any);
             } else {
               router.back();
             }

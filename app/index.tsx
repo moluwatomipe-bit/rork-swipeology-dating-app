@@ -11,9 +11,9 @@ export default function Index() {
     if (!isReady) return;
 
     if (currentUser && onboardingStep === 'complete') {
-      router.replace('/(tabs)/swipe');
+      router.replace('/(tabs)/swipe' as any);
     } else {
-      router.replace('/onboarding');
+      router.replace('/onboarding' as any);
     }
   }, [isReady, currentUser, onboardingStep]);
 

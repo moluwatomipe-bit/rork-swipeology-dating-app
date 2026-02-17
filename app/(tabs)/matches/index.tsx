@@ -28,7 +28,7 @@ export default function MatchesScreen() {
   const handleOpenChat = useCallback((match: Match & { otherUser: User }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
-      pathname: '/(tabs)/matches/chat',
+      pathname: '/(tabs)/matches/chat' as any,
       params: {
         matchId: match.id,
         userName: match.otherUser.first_name,

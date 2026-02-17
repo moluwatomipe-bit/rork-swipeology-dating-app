@@ -38,7 +38,7 @@ export default function ChangePasswordScreen() {
 
   if (!currentUser.phone_verified) {
     router.replace({
-      pathname: '/(tabs)/profile/verify-phone',
+      pathname: '/(tabs)/profile/verify-phone' as any,
       params: { redirect: 'password' },
     });
     return null;

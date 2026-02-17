@@ -185,7 +185,7 @@ export default function OnboardingScreen() {
           try {
             await login(loginEmail.trim(), loginPassword.trim());
             goToStep('complete');
-            router.replace('/(tabs)/swipe');
+            router.replace('/(tabs)/swipe' as any);
           } catch (loginErr: any) {
             setError(loginErr?.message || 'Invalid email or password');
             return;
@@ -1087,7 +1087,7 @@ export default function OnboardingScreen() {
             updateUser(newUser);
             await completeRegistration(newUser);
             goToStep('complete');
-            router.replace('/(tabs)/swipe');
+            router.replace('/(tabs)/swipe' as any);
           } catch (e) {
             const msg = e instanceof Error ? e.message : 'Something went wrong.';
             setError(msg);
