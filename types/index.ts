@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   phone_number: string;
+  phone_verified: boolean;
   school_email: string;
   password: string;
   university: string;
@@ -8,6 +9,7 @@ export interface User {
   first_name: string;
   age: number;
   gender: 'man' | 'woman' | 'non-binary' | 'prefer not to say';
+  pronouns: string;
   dating_preference: 'men' | 'women' | 'both';
   wants_friends: boolean;
   wants_dating: boolean;
@@ -21,6 +23,7 @@ export interface User {
   major: string;
   class_year: string;
   interests: string;
+  blocked_users: string[];
 }
 
 export interface Swipe {

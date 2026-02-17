@@ -10,7 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Send, Flag, Ban } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,15 +26,25 @@ export default function ChatScreen() {
     userName: string;
     context: string;
   }>();
-  const { currentUser } = useAuth();
-  const { getMessagesForMatch, sendMessage } = useData();
+  const { currentUser, blockUser, reportUser } = useAuth();
+  const { getMessagesForMatch, sendMessage, getOtherUserForMatch, removeMatch } = useData();
   const [inputText, setInputText] = useState<string>('');
   const flatListRef = useRef<FlatList<Message>>(null);
+
+  const otherUser = useMemo(
+    () => getOtherUserForMatch(matchId || ''),
+    [matchId, getOtherUserForMatch]
+  );
 
   const chatMessages = useMemo(
     () => getMessagesForMatch(matchId || ''),
     [matchId, getMessagesForMatch]
   );
+
+  const isBlocked = useMemo(() => {
+    if (!currentUser || !otherUser) return false;
+    return (currentUser.blocked_users || []).includes(otherUser.id);
+  }, [currentUser, otherUser]);
 
   useEffect(() => {
     if (chatMessages.length > 0) {
@@ -45,39 +55,71 @@ export default function ChatScreen() {
   }, [chatMessages.length]);
 
   const handleSend = useCallback(() => {
-    if (!inputText.trim() || !matchId) return;
+    if (!inputText.trim() || !matchId || isBlocked) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMessage(matchId, inputText.trim());
     setInputText('');
-  }, [inputText, matchId, sendMessage]);
+  }, [inputText, matchId, sendMessage, isBlocked]);
 
   const handleReport = useCallback(() => {
     Alert.alert(
       'Report User',
       'Why are you reporting this user?',
       [
-        { text: 'Harassment', onPress: () => Alert.alert('Reported', 'Thank you for your report. We will review it.') },
-        { text: 'Fake Profile', onPress: () => Alert.alert('Reported', 'Thank you for your report. We will review it.') },
-        { text: 'Inappropriate', onPress: () => Alert.alert('Reported', 'Thank you for your report. We will review it.') },
+        {
+          text: 'Harassment',
+          onPress: async () => {
+            await reportUser(otherUser?.id || '', 'Harassment', matchId || null);
+            Alert.alert('Reported', 'Thank you for your report. We will review it.');
+          },
+        },
+        {
+          text: 'Fake Profile',
+          onPress: async () => {
+            await reportUser(otherUser?.id || '', 'Fake Profile', matchId || null);
+            Alert.alert('Reported', 'Thank you for your report. We will review it.');
+          },
+        },
+        {
+          text: 'Inappropriate',
+          onPress: async () => {
+            await reportUser(otherUser?.id || '', 'Inappropriate', matchId || null);
+            Alert.alert('Reported', 'Thank you for your report. We will review it.');
+          },
+        },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
-  }, []);
+  }, [otherUser, matchId, reportUser]);
 
   const handleBlock = useCallback(() => {
     Alert.alert(
       'Block User',
-      `Are you sure you want to block ${userName}? You won't see each other anymore.`,
+      `Are you sure you want to block ${userName}? They won't be able to see your profile, message you, or appear in your feed.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Block',
           style: 'destructive',
-          onPress: () => Alert.alert('Blocked', `${userName} has been blocked.`),
+          onPress: async () => {
+            try {
+              await blockUser(otherUser?.id || '');
+              if (matchId) {
+                removeMatch(matchId);
+              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              Alert.alert('Blocked', `${userName} has been blocked.`, [
+                { text: 'OK', onPress: () => router.back() },
+              ]);
+            } catch (e) {
+              console.log('Block error:', e);
+              Alert.alert('Error', 'Failed to block user. Please try again.');
+            }
+          },
         },
       ]
     );
-  }, [userName]);
+  }, [userName, otherUser, matchId, blockUser, removeMatch]);
 
   const contextLabel = context === 'friends' ? 'Friends' : 'Dating';
   const headerTitle = `${userName || ''} · ${contextLabel}`;
@@ -144,27 +186,34 @@ export default function ChatScreen() {
           />
         )}
 
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type a message..."
-            placeholderTextColor={theme.textMuted}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-            testID="chat-input"
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={!inputText.trim()}
-            activeOpacity={0.7}
-            testID="send-btn"
-          >
-            <Send size={20} color={inputText.trim() ? '#fff' : theme.textMuted} />
-          </TouchableOpacity>
-        </View>
+        {isBlocked ? (
+          <View style={styles.blockedBar}>
+            <Ban size={16} color={theme.error} />
+            <Text style={styles.blockedText}>You have blocked this user</Text>
+          </View>
+        ) : (
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type a message..."
+              placeholderTextColor={theme.textMuted}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+              testID="chat-input"
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+              onPress={handleSend}
+              disabled={!inputText.trim()}
+              activeOpacity={0.7}
+              testID="send-btn"
+            >
+              <Send size={20} color={inputText.trim() ? '#fff' : theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -278,5 +327,20 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: theme.surface,
+  },
+  blockedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    backgroundColor: theme.surface,
+  },
+  blockedText: {
+    fontSize: 14,
+    color: theme.error,
+    fontWeight: '500' as const,
   },
 });

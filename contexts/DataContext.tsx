@@ -174,6 +174,8 @@ export const [DataProvider, useData] = createContextHook(() => {
   const getFilteredUsers = useCallback((context: 'friends' | 'dating'): User[] => {
     if (!currentUser) return [];
 
+    const blockedIds = currentUser.blocked_users || [];
+
     const swipedUserIds = swipes
       .filter((s) => s.user_from === currentUser.id && s.context === context)
       .map((s) => s.user_to);
@@ -181,17 +183,21 @@ export const [DataProvider, useData] = createContextHook(() => {
     return MOCK_USERS.filter((u) => {
       if (u.id === currentUser.id) return false;
       if (swipedUserIds.includes(u.id)) return false;
-      if (u.university !== 'East Stroudsburg University') return false;
+      if (blockedIds.includes(u.id)) return false;
+      if ((u.blocked_users || []).includes(currentUser.id)) return false;
+      if (u.university !== currentUser.university) return false;
       if (!u.is_verified_esu) return false;
 
       if (context === 'friends') {
-        return u.wants_friends;
+        return u.wants_friends && currentUser.wants_friends;
       }
 
       if (context === 'dating') {
-        if (!u.wants_dating) return false;
+        if (!u.wants_dating || !currentUser.wants_dating) return false;
         if (currentUser.dating_preference === 'men' && u.gender !== 'man') return false;
         if (currentUser.dating_preference === 'women' && u.gender !== 'woman') return false;
+        if (u.dating_preference === 'men' && currentUser.gender !== 'man') return false;
+        if (u.dating_preference === 'women' && currentUser.gender !== 'woman') return false;
         return true;
       }
 
@@ -201,11 +207,14 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const getMatchesForContext = useCallback((context: 'friends' | 'dating'): (Match & { otherUser: User })[] => {
     if (!currentUser) return [];
+    const blockedIds = currentUser.blocked_users || [];
+
     return matches
       .filter((m) => m.context === context)
       .filter((m) => m.user1 === currentUser.id || m.user2 === currentUser.id)
       .map((m) => {
         const otherId = m.user1 === currentUser.id ? m.user2 : m.user1;
+        if (blockedIds.includes(otherId)) return null;
         const otherUser = MOCK_USERS.find((u) => u.id === otherId);
         return otherUser ? { ...m, otherUser } : null;
       })
@@ -216,6 +225,31 @@ export const [DataProvider, useData] = createContextHook(() => {
     return messages.filter((m) => m.match_id === matchId);
   }, [messages]);
 
+  const getOtherUserForMatch = useCallback((matchId: string): User | null => {
+    if (!currentUser) return null;
+    const match = matches.find((m) => m.id === matchId);
+    if (!match) return null;
+    const otherId = match.user1 === currentUser.id ? match.user2 : match.user1;
+    return MOCK_USERS.find((u) => u.id === otherId) || null;
+  }, [currentUser, matches]);
+
+  const removeMatchMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const updated = matches.filter((m) => m.id !== matchId);
+      await AsyncStorage.setItem(STORAGE_MATCHES, JSON.stringify(updated));
+      return updated;
+    },
+    onSuccess: (updated) => {
+      setMatches(updated);
+    },
+  });
+
+  const { mutate: removeMatchMutate } = removeMatchMutation;
+
+  const removeMatch = useCallback((matchId: string) => {
+    removeMatchMutate(matchId);
+  }, [removeMatchMutate]);
+
   return {
     swipes,
     matches,
@@ -225,5 +259,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     getFilteredUsers,
     getMatchesForContext,
     getMessagesForMatch,
+    getOtherUserForMatch,
+    removeMatch,
   };
 });

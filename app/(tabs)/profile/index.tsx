@@ -21,6 +21,9 @@ import {
   Shield,
   ChevronRight,
   Edit3,
+  Lock,
+  Settings,
+  Phone,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +33,35 @@ const theme = Colors.dark;
 
 export default function ProfileScreen() {
   const { currentUser, logout, deleteAccount } = useAuth();
+
+  const handleEditProfile = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!currentUser?.phone_verified) {
+      router.push({
+        pathname: '/(tabs)/profile/verify-phone',
+        params: { redirect: 'edit' },
+      });
+    } else {
+      router.push('/(tabs)/profile/edit');
+    }
+  }, [currentUser]);
+
+  const handleChangePassword = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!currentUser?.phone_verified) {
+      router.push({
+        pathname: '/(tabs)/profile/verify-phone',
+        params: { redirect: 'password' },
+      });
+    } else {
+      router.push('/(tabs)/profile/change-password');
+    }
+  }, [currentUser]);
+
+  const handlePreferences = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(tabs)/profile/preferences');
+  }, []);
 
   const handleLogout = useCallback(() => {
     Alert.alert(
@@ -108,22 +140,43 @@ export default function ProfileScreen() {
               style={styles.avatar}
               contentFit="cover"
             />
-            <LinearGradient
-              colors={['#A855F7', '#EC4899']}
-              style={styles.editAvatarBtn}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Edit3 size={14} color="#fff" />
-            </LinearGradient>
+            <TouchableOpacity onPress={handleEditProfile} activeOpacity={0.7}>
+              <LinearGradient
+                colors={['#A855F7', '#EC4899']}
+                style={styles.editAvatarBtn}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Edit3 size={14} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>
             {currentUser.first_name || 'User'}{currentUser.age ? `, ${currentUser.age}` : ''}
           </Text>
+          {currentUser.pronouns ? (
+            <Text style={styles.pronounsText}>{currentUser.pronouns}</Text>
+          ) : null}
           <View style={styles.verifiedRow}>
             <Shield size={14} color={theme.secondary} />
             <Text style={styles.verifiedText}>Verified ESU Student</Text>
           </View>
+          {currentUser.phone_verified ? (
+            <View style={styles.verifiedRow}>
+              <Phone size={13} color={theme.primary} />
+              <Text style={[styles.verifiedText, { color: theme.primary }]}>Phone Verified</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.verifyPhoneBanner}
+              onPress={() => router.push('/(tabs)/profile/verify-phone')}
+              activeOpacity={0.7}
+            >
+              <Phone size={16} color={theme.warning} />
+              <Text style={styles.verifyPhoneText}>Verify your phone number</Text>
+              <ChevronRight size={16} color={theme.warning} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {currentUser.bio ? (
@@ -194,6 +247,44 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          <View style={styles.sectionCard}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleEditProfile}
+              activeOpacity={0.7}
+              testID="edit-profile-btn"
+            >
+              <Edit3 size={20} color={theme.textSecondary} />
+              <Text style={styles.menuText}>Edit Profile</Text>
+              <ChevronRight size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handlePreferences}
+              activeOpacity={0.7}
+              testID="preferences-btn"
+            >
+              <Settings size={20} color={theme.textSecondary} />
+              <Text style={styles.menuText}>Preferences</Text>
+              <ChevronRight size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleChangePassword}
+              activeOpacity={0.7}
+              testID="change-password-btn"
+            >
+              <Lock size={20} color={theme.textSecondary} />
+              <Text style={styles.menuText}>Change Password</Text>
+              <ChevronRight size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.sectionCard}>
             <TouchableOpacity
@@ -249,7 +340,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
     paddingVertical: 24,
-    gap: 8,
+    gap: 6,
   },
   avatarContainer: {
     position: 'relative',
@@ -278,6 +369,11 @@ const styles = StyleSheet.create({
     fontWeight: '800' as const,
     color: theme.text,
   },
+  pronounsText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    fontWeight: '500' as const,
+  },
   verifiedRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -287,6 +383,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.secondary,
     fontWeight: '500' as const,
+  },
+  verifyPhoneBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFC10715',
+    borderWidth: 1,
+    borderColor: '#FFC10740',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+    marginHorizontal: 20,
+  },
+  verifyPhoneText: {
+    flex: 1,
+    fontSize: 14,
+    color: theme.warning,
+    fontWeight: '600' as const,
   },
   section: {
     paddingHorizontal: 20,
