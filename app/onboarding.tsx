@@ -318,11 +318,13 @@ export default function OnboardingScreen() {
         <Text style={styles.inputLabel}>Phone number</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="(555) 123‑4567"
+          placeholder="(555) 123-4567"
           placeholderTextColor={theme.textMuted}
           keyboardType="phone-pad"
+          returnKeyType="done"
           value={phoneNumber}
           onChangeText={setPhoneNumber}
+          blurOnSubmit={true}
         />
       </View>
 
@@ -379,6 +381,7 @@ export default function OnboardingScreen() {
           }}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoFocus={true}
         />
       </View>
 
