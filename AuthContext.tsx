@@ -1,73 +1,101 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/constants/supabase';
+import { supabase } from '@/lib/supabase';
+import { Session, User } from '@supabase/supabase-js';
 
 type AuthContextType = {
-  user: any;
-  session: any;
+  user: User | null;
+  session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<any>;
-  signUp: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string, metadata?: Record<string, any>) => Promise<{ user: User | null; error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ user: User | null; error: string | null }>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<any>;
+  resetPassword: (email: string) => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load session on mount
   useEffect(() => {
-    const getSession = async () => {
+    const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
-      setSession(data.session || null);
-      setUser(data.session?.user || null);
+      setSession(data.session ?? null);
+      setUser(data.session?.user ?? null);
       setLoading(false);
     };
 
-    getSession();
+    loadSession();
 
     // Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user || null);
-      }
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+    });
 
     return () => {
       listener.subscription.unsubscribe();
     };
   }, []);
 
+  // SIGN UP
+  const signUp = async (email: string, password: string, metadata: Record<string, any> = {}) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata, // store onboarding metadata in auth user
+        },
+      });
+
+      if (error) return { user: null, error: error.message };
+
+      return { user: data.user, error: null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Signup failed';
+      return { user: null, error: msg };
+    }
+  };
+
+  // SIGN IN
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) return { user: null, error: error.message };
+
+      return { user: data.user, error: null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Login failed';
+      return { user: null, error: msg };
+    }
   };
 
-  const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
-  };
-
+  // SIGN OUT
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
   };
 
+  // RESET PASSWORD (Supabase email reset)
   const resetPassword = async (email: string) => {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
-    return data;
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+      if (error) return error.message;
+
+      return null; // success
+    } catch (e) {
+      return e instanceof Error ? e.message : 'Password reset failed';
+    }
   };
 
   return (
@@ -76,8 +104,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user,
         session,
         loading,
-        signIn,
         signUp,
+        signIn,
         signOut,
         resetPassword,
       }}
