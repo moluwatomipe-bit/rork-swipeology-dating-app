@@ -253,7 +253,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const completeRegistration = useCallback(async (user: User) => {
     console.log('[Auth] Completing registration for:', user.school_email);
     await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
     setCurrentUser(user);
+    setHasProfile(true);
+    setProfileChecked(true);
+    setOnboardingStep('complete');
+    console.log('[Auth] Registration complete, hasProfile set to true');
   }, []);
 
   const resetPasswordMutation = useMutation({
@@ -381,6 +386,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       setCurrentUser(null);
       setSession(null);
       setOnboardingStep('welcome');
+      setHasProfile(null);
+      setProfileChecked(false);
       queryClient.clear();
     },
   });
@@ -395,6 +402,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       setCurrentUser(null);
       setSession(null);
       setOnboardingStep('welcome');
+      setHasProfile(null);
+      setProfileChecked(false);
       queryClient.clear();
     },
   });

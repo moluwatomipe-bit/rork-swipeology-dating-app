@@ -12,14 +12,17 @@ export default function Index() {
 
     console.log('[Nav] Routing decision - session:', !!session, 'hasProfile:', hasProfile, 'currentUser:', !!currentUser, 'step:', onboardingStep);
 
-    if (session && hasProfile && currentUser) {
+    if (!session) {
+      console.log('[Nav] No session, going to onboarding');
+      router.replace('/onboarding' as any);
+      return;
+    }
+
+    if (hasProfile === true) {
       console.log('[Nav] Profile exists, going to main app');
       router.replace('/(tabs)/swipe' as any);
-    } else if (session && hasProfile === false) {
+    } else {
       console.log('[Nav] Logged in but no profile, going to onboarding');
-      router.replace('/onboarding' as any);
-    } else if (!session) {
-      console.log('[Nav] No session, going to onboarding');
       router.replace('/onboarding' as any);
     }
   }, [isReady, profileChecked, session, hasProfile, currentUser, onboardingStep]);
