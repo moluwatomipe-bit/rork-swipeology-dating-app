@@ -37,7 +37,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/colors';
-import { supabase } from '@/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const theme = Colors.dark;
@@ -50,7 +49,7 @@ export default function OnboardingScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // Auth functions
-  const { signUp, signIn, resetPassword, user } = useAuth();
+  const { login, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser } = useAuth();
 
   // Step navigation
   const [onboardingStep, setOnboardingStep] = useState<'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('login');
@@ -180,13 +179,10 @@ export default function OnboardingScreen() {
           setError('');
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-          const { user, error: loginErr } = await signIn(
-            loginEmail.trim(),
-            loginPassword.trim()
-          );
-
-          if (loginErr) {
-            setError(loginErr);
+          try {
+            await login(loginEmail.trim(), loginPassword.trim());
+          } catch (loginErr: any) {
+            setError(loginErr?.message || 'Invalid email or password');
             return;
           }
 
@@ -269,15 +265,15 @@ export default function OnboardingScreen() {
 
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-          const err = await resetPassword(loginEmail.trim());
-          if (err) {
-            setError(err);
+          const account = await lookupAccountByEmail(loginEmail.trim());
+          if (!account) {
+            setError('No account found with that email.');
             return;
           }
 
           Alert.alert(
-            'Reset Email Sent',
-            'Check your inbox for a password reset link.'
+            'Reset Password',
+            'Please contact support or use the forgot password flow to reset your password.'
           );
 
           animateTransition('login');
@@ -497,19 +493,7 @@ export default function OnboardingScreen() {
 
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-          // SUPABASE SIGNUP
-          const { user: newUser, error: signUpErr } = await signUp(
-            schoolEmail.trim(),
-            password.trim(),
-            {
-              onboarding_started: true,
-            }
-          );
-
-          if (signUpErr) {
-            setError(signUpErr);
-            return;
-          }
+          setError('');
 
           animateTransition('name-age');
         }}
@@ -1053,54 +1037,40 @@ export default function OnboardingScreen() {
       <TouchableOpacity
         style={styles.primaryButton}
         onPress={async () => {
-          if (!user) {
-            setError('You must be logged in to finish onboarding.');
-            return;
-          }
-
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
           try {
-            const { error: upsertErr } = await supabase
-              .from('users')
-              .upsert({
-                auth_id: user.id,
-                email: user.email,
+            const newUser = {
+              id: `user_${Date.now()}`,
+              phone_number: '',
+              phone_verified: false,
+              school_email: schoolEmail.trim(),
+              password: password.trim(),
+              university: 'East Stroudsburg University',
+              is_verified_esu: true,
+              first_name: firstName.trim(),
+              age: parseInt(age, 10) || 18,
+              gender: gender || 'prefer not to say' as const,
+              pronouns: '',
+              dating_preference: datingPreference || 'both' as const,
+              wants_friends: wantsFriends,
+              wants_dating: wantsDating,
+              photo1_url: photos[0] || '',
+              photo2_url: photos[1] || '',
+              photo3_url: photos[2] || '',
+              photo4_url: photos[3] || '',
+              photo5_url: photos[4] || '',
+              photo6_url: photos[5] || '',
+              bio: bio.trim(),
+              major: major.trim(),
+              class_year: classYear.trim(),
+              interests: interests.trim(),
+              blocked_users: [],
+            };
 
-                // BASIC INFO
-                first_name: firstName.trim(),
-                age: parseInt(age, 10),
-                gender,
-                dating_preference: datingPreference,
-
-                // INTENT
-                wants_friends: wantsFriends,
-                wants_dating: wantsDating,
-
-                // PHOTOS
-                photo1_url: photos[0] || null,
-                photo2_url: photos[1] || null,
-                photo3_url: photos[2] || null,
-                photo4_url: photos[3] || null,
-                photo5_url: photos[4] || null,
-                photo6_url: photos[5] || null,
-
-                // BIO DETAILS
-                bio: bio.trim(),
-                major: major.trim(),
-                class_year: classYear.trim(),
-                interests: interests.trim(),
-
-                // STATUS
-                onboarding_complete: true,
-                updated_at: new Date().toISOString(),
-              });
-
-            if (upsertErr) {
-              setError(upsertErr.message);
-              return;
-            }
-
+            updateUser(newUser);
+            await completeRegistration(newUser);
+            goToStep('complete');
             router.replace('/(tabs)/swipe');
           } catch (e) {
             const msg = e instanceof Error ? e.message : 'Something went wrong.';
