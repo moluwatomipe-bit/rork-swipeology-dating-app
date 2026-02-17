@@ -2,24 +2,34 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
+import { supabase } from '@/supabase';
 import { User, OnboardingStep } from '@/types';
+import type { Session } from '@supabase/supabase-js';
 
 const STORAGE_KEY_USER = '@swipeology_user';
 const STORAGE_KEY_ONBOARDING = '@swipeology_onboarding';
-const STORAGE_KEY_ACCOUNTS = '@swipeology_accounts';
 const STORAGE_KEY_REPORTS = '@swipeology_reports';
-
-interface StoredAccount {
-  email: string;
-  password: string;
-  user: User;
-}
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('welcome');
   const [isReady, setIsReady] = useState<boolean>(false);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      console.log('[Auth] Initial session:', s?.user?.email ?? 'none');
+      setSession(s);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      console.log('[Auth] Auth state changed:', _event, s?.user?.email ?? 'none');
+      setSession(s);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const loadStoredData = useQuery({
     queryKey: ['auth', 'stored'],
@@ -70,21 +80,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
-  const registerAccountMutation = useMutation({
-    mutationFn: async (account: StoredAccount) => {
-      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-      const idx = accounts.findIndex((a) => a.email.toLowerCase() === account.email.toLowerCase());
-      if (idx >= 0) {
-        accounts[idx] = account;
-      } else {
-        accounts.push(account);
-      }
-      await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
-      return account;
-    },
-  });
-
   const { mutate: saveUser } = saveUserMutation;
 
   const updateUser = useCallback((updates: Partial<User>) => {
@@ -96,21 +91,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     saveUser(updated);
   }, [currentUser, saveUser]);
 
-  const syncAccountStorage = useCallback(async (user: User) => {
-    if (user.school_email && user.password) {
-      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-      const idx = accounts.findIndex(
-        (a) => a.email.toLowerCase() === user.school_email.toLowerCase()
-      );
-      if (idx >= 0) {
-        accounts[idx].user = user;
-        accounts[idx].password = user.password;
-        await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
-      }
-    }
-  }, []);
-
   const { mutate: saveStep } = saveOnboardingStepMutation;
 
   const goToStep = useCallback((step: OnboardingStep) => {
@@ -118,56 +98,92 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     saveStep(step);
   }, [saveStep]);
 
-  const { mutateAsync: registerAccount } = registerAccountMutation;
-
-  const completeRegistration = useCallback(async (user: User) => {
-    if (user.school_email && user.password) {
-      await registerAccount({
-        email: user.school_email.toLowerCase(),
-        password: user.password,
-        user,
+  const signUpMutation = useMutation({
+    mutationFn: async ({ email, password: pw }: { email: string; password: string }) => {
+      console.log('[Auth] Signing up with Supabase:', email);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: pw,
       });
-      console.log('Account registered for:', user.school_email);
-    }
-  }, [registerAccount]);
+      if (error) {
+        console.log('[Auth] Signup error:', error.message);
+        throw new Error(error.message);
+      }
+      console.log('[Auth] Signup success:', data.user?.id);
+      return data;
+    },
+  });
+
+  const signUp = useCallback(async (email: string, pw: string) => {
+    return signUpMutation.mutateAsync({ email, password: pw });
+  }, [signUpMutation]);
 
   const loginMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-      const account = accounts.find(
-        (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-      );
-      if (!account) {
-        throw new Error('Invalid email or password. Please try again.');
+    mutationFn: async ({ email, password: pw }: { email: string; password: string }) => {
+      console.log('[Auth] Signing in with Supabase:', email);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: pw,
+      });
+      if (error) {
+        console.log('[Auth] Login error:', error.message);
+        throw new Error(error.message);
       }
-      const user = account.user;
-      if (user.phone_verified === undefined) user.phone_verified = false;
-      if (user.pronouns === undefined) user.pronouns = '';
-      if (user.blocked_users === undefined) user.blocked_users = [];
-      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-      await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
-      return user;
+      console.log('[Auth] Login success:', data.user?.id);
+
+      const storedUserStr = await AsyncStorage.getItem(STORAGE_KEY_USER);
+      if (storedUserStr) {
+        const user = JSON.parse(storedUserStr) as User;
+        if (user.phone_verified === undefined) user.phone_verified = false;
+        if (user.pronouns === undefined) user.pronouns = '';
+        if (user.blocked_users === undefined) user.blocked_users = [];
+        setCurrentUser(user);
+        setOnboardingStep('complete');
+        await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
+        return user;
+      }
+
+      return null;
     },
-    onSuccess: (user) => {
-      setCurrentUser(user);
-      setOnboardingStep('complete');
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'stored'] });
     },
   });
 
   const { mutateAsync: doLogin } = loginMutation;
 
-  const login = useCallback(async (email: string, password: string) => {
-    return doLogin({ email, password });
+  const login = useCallback(async (email: string, pw: string) => {
+    return doLogin({ email, password: pw });
   }, [doLogin]);
+
+  const completeRegistration = useCallback(async (user: User) => {
+    console.log('[Auth] Completing registration for:', user.school_email);
+    await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    setCurrentUser(user);
+  }, []);
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ email }: { email: string }) => {
+      console.log('[Auth] Sending password reset to:', email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) {
+        console.log('[Auth] Reset password error:', error.message);
+        throw new Error(error.message);
+      }
+      console.log('[Auth] Password reset email sent');
+      return true;
+    },
+  });
+
+  const resetPassword = useCallback(async (email: string) => {
+    return resetPasswordMutation.mutateAsync({ email });
+  }, [resetPasswordMutation]);
 
   const verifyPhoneMutation = useMutation({
     mutationFn: async () => {
       if (!currentUser) throw new Error('No user');
       const updated = { ...currentUser, phone_verified: true };
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-      await syncAccountStorage(updated);
       return updated;
     },
     onSuccess: (updated) => {
@@ -183,11 +199,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const changePasswordMutation = useMutation({
     mutationFn: async ({ newPassword }: { newPassword: string }) => {
+      console.log('[Auth] Changing password via Supabase');
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        console.log('[Auth] Change password error:', error.message);
+        throw new Error(error.message);
+      }
       if (!currentUser) throw new Error('No user');
-      if (!currentUser.phone_verified) throw new Error('Phone not verified');
       const updated = { ...currentUser, password: newPassword };
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-      await syncAccountStorage(updated);
       return updated;
     },
     onSuccess: (updated) => {
@@ -210,7 +230,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       const updated = { ...currentUser, blocked_users: blocked };
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-      await syncAccountStorage(updated);
       return updated;
     },
     onSuccess: (updated) => {
@@ -248,46 +267,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     return doReportUser({ reportedId, reason, matchId });
   }, [doReportUser]);
 
-  const lookupAccountByEmail = useCallback(async (email: string): Promise<{ phone_number: string } | null> => {
-    const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-    const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-    const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
-    if (!account) return null;
-    return { phone_number: account.user.phone_number || '' };
+  const lookupAccountByEmail = useCallback(async (_email: string): Promise<{ phone_number: string } | null> => {
+    return { phone_number: '' };
   }, []);
-
-  const resetPasswordMutation = useMutation({
-    mutationFn: async ({ email, newPassword }: { email: string; newPassword: string }) => {
-      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-      const idx = accounts.findIndex((a) => a.email.toLowerCase() === email.toLowerCase());
-      if (idx < 0) throw new Error('Account not found');
-      accounts[idx].password = newPassword;
-      accounts[idx].user.password = newPassword;
-      await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
-      return true;
-    },
-  });
-
-  const { mutateAsync: doResetPassword } = resetPasswordMutation;
-
-  const resetPassword = useCallback(async (email: string, newPassword: string) => {
-    return doResetPassword({ email, newPassword });
-  }, [doResetPassword]);
 
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
-      const email = currentUser?.school_email?.toLowerCase();
-      if (email) {
-        const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-        const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-        const filtered = accounts.filter((a) => a.email.toLowerCase() !== email);
-        await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(filtered));
-      }
+      console.log('[Auth] Deleting account');
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING, '@swipeology_swipes', '@swipeology_matches', '@swipeology_messages']);
+      await supabase.auth.signOut();
     },
     onSuccess: () => {
       setCurrentUser(null);
+      setSession(null);
       setOnboardingStep('welcome');
       queryClient.clear();
     },
@@ -295,21 +287,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      if (currentUser?.school_email && currentUser?.password) {
-        const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
-        const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
-        const idx = accounts.findIndex(
-          (a) => a.email.toLowerCase() === currentUser.school_email.toLowerCase()
-        );
-        if (idx >= 0) {
-          accounts[idx].user = currentUser;
-          await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
-        }
-      }
+      console.log('[Auth] Logging out');
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING]);
+      await supabase.auth.signOut();
     },
     onSuccess: () => {
       setCurrentUser(null);
+      setSession(null);
       setOnboardingStep('welcome');
       queryClient.clear();
     },
@@ -329,6 +313,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   return {
     currentUser,
+    session,
     onboardingStep,
     isReady,
     updateUser,
@@ -336,6 +321,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     logout,
     deleteAccount,
     login,
+    signUp,
     completeRegistration,
     verifyPhone,
     changePassword,
@@ -344,7 +330,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     lookupAccountByEmail,
     resetPassword,
     isLoggingIn: loginMutation.isPending,
+    isSigningUp: signUpMutation.isPending,
     loginError: loginMutation.error?.message ?? null,
+    signUpError: signUpMutation.error?.message ?? null,
     isLoading: loadStoredData.isLoading,
   };
 });

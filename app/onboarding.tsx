@@ -49,7 +49,8 @@ export default function OnboardingScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // Auth functions
-  const { login, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser } = useAuth();
+  const { login, signUp, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser, isLoggingIn, isSigningUp } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Step navigation
   const [onboardingStep, setOnboardingStep] = useState<'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('login');
@@ -166,7 +167,8 @@ export default function OnboardingScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
+        disabled={isLoggingIn}
         onPress={async () => {
           if (!loginEmail.trim()) {
             setError('Please enter your email');
@@ -182,12 +184,12 @@ export default function OnboardingScreen() {
 
           try {
             await login(loginEmail.trim(), loginPassword.trim());
+            goToStep('complete');
+            router.replace('/(tabs)/swipe');
           } catch (loginErr: any) {
             setError(loginErr?.message || 'Invalid email or password');
             return;
           }
-
-          router.replace('/(tabs)/swipe');
         }}
         activeOpacity={0.8}
       >
@@ -197,7 +199,7 @@ export default function OnboardingScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.primaryButtonText}>Log In</Text>
+          <Text style={styles.primaryButtonText}>{isLoggingIn ? 'Logging in...' : 'Log In'}</Text>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -257,7 +259,8 @@ export default function OnboardingScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+        disabled={isSubmitting}
         onPress={async () => {
           if (!loginEmail.trim()) {
             setError('Please enter your email');
@@ -265,19 +268,21 @@ export default function OnboardingScreen() {
           }
 
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setIsSubmitting(true);
+          setError('');
 
-          const account = await lookupAccountByEmail(loginEmail.trim());
-          if (!account) {
-            setError('No account found with that email.');
-            return;
+          try {
+            await resetPassword(loginEmail.trim());
+            Alert.alert(
+              'Check your email',
+              'We sent a password reset link to your email address.'
+            );
+            animateTransition('login');
+          } catch (e: any) {
+            setError(e?.message || 'Failed to send reset link');
+          } finally {
+            setIsSubmitting(false);
           }
-
-          Alert.alert(
-            'Reset Password',
-            'Please contact support or use the forgot password flow to reset your password.'
-          );
-
-          animateTransition('login');
         }}
         activeOpacity={0.8}
       >
@@ -287,7 +292,7 @@ export default function OnboardingScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.primaryButtonText}>Send Reset Link</Text>
+          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Sending...' : 'Send Reset Link'}</Text>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -484,7 +489,8 @@ export default function OnboardingScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, isSigningUp && styles.buttonDisabled]}
+        disabled={isSigningUp}
         onPress={async () => {
           if (password.length < 6) {
             setError('Password must be at least 6 characters');
@@ -496,10 +502,16 @@ export default function OnboardingScreen() {
           }
 
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
           setError('');
 
-          animateTransition('name-age');
+          try {
+            await signUp(schoolEmail.trim(), password.trim());
+            console.log('[Onboarding] Supabase signup successful');
+            animateTransition('name-age');
+          } catch (e: any) {
+            console.log('[Onboarding] Supabase signup error:', e?.message);
+            setError(e?.message || 'Signup failed. Please try again.');
+          }
         }}
         activeOpacity={0.8}
       >
@@ -507,7 +519,7 @@ export default function OnboardingScreen() {
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
         >
-          <Text style={styles.primaryButtonText}>Continue</Text>
+          <Text style={styles.primaryButtonText}>{isSigningUp ? 'Creating account...' : 'Continue'}</Text>
         </LinearGradient>
       </TouchableOpacity>
 
