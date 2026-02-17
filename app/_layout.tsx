@@ -3,27 +3,38 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AuthProvider } from "@/contexts/AuthContext";
+
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
-
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const { user, profile, loading } = useAuth();
+
+  // Don’t render anything until AuthContext finishes loading
+  if (loading) return null;
+
   return (
     <Stack
       screenOptions={{
         headerBackTitle: "Back",
         contentStyle: { backgroundColor: Colors.dark.background },
+        headerShown: false,
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      {/* No user → show login */}
+      {!user && <Stack.Screen name="index" />}
+
+      {/* User exists but no profile → onboarding */}
+      {user && !profile && <Stack.Screen name="onboarding" />}
+
+      {/* User + profile → main app */}
+      {user && profile && <Stack.Screen name="(tabs)" />}
     </Stack>
   );
 }
