@@ -49,7 +49,7 @@ type DatingPrefOption = 'men' | 'women' | 'both';
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const { onboardingStep, goToStep, updateUser, login, completeRegistration, currentUser, isLoggingIn, lookupAccountByEmail, resetPassword } = useAuth();
+  const { onboardingStep, goToStep, updateUser, completeRegistration, currentUser, isLoggingIn, lookupAccountByEmail, resetPassword } = useAuth();
   const { requestPermissions } = useNotifications();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
