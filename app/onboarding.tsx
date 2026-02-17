@@ -37,6 +37,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/colors';
+import { supabase } from '@/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const theme = Colors.dark;
@@ -52,7 +53,7 @@ export default function OnboardingScreen() {
   const { signUp, signIn, resetPassword, user } = useAuth();
 
   // Step navigation
-  const [onboardingStep, setOnboardingStep] = useState<'login' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial'>('login');
+  const [onboardingStep, setOnboardingStep] = useState<'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('login');
 
   const animateTransition = (next: typeof onboardingStep) => {
     Animated.timing(fadeAnim, {
@@ -1143,5 +1144,245 @@ export default function OnboardingScreen() {
   );
 }
 
-
-  
+const styles = StyleSheet.create({
+  stepContainer: {
+    flex: 1,
+    paddingHorizontal: 28,
+    justifyContent: 'center',
+    backgroundColor: theme.background,
+  },
+  scrollStep: {
+    flex: 1,
+    backgroundColor: theme.background,
+  },
+  scrollContent: {
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+    paddingTop: 20,
+  },
+  stepHeader: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  stepIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  stepTitle: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    color: theme.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  stepDescription: {
+    fontSize: 15,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  inputGroup: {
+    marginBottom: 18,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: theme.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  textInput: {
+    backgroundColor: theme.inputBg,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: theme.text,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.inputBg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: theme.text,
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  errorText: {
+    color: theme.error,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  primaryButton: {
+    borderRadius: 14,
+    overflow: 'hidden' as const,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  buttonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700' as const,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  secondaryButtonText: {
+    color: theme.primary,
+    fontSize: 15,
+    fontWeight: '600' as const,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  forgotPasswordText: {
+    color: theme.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  optionsContainer: {
+    marginBottom: 16,
+    gap: 10,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+  },
+  optionButtonSelected: {
+    borderColor: theme.primary,
+    backgroundColor: theme.card,
+  },
+  optionText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    fontWeight: '500' as const,
+  },
+  optionTextSelected: {
+    color: theme.text,
+    fontWeight: '600' as const,
+  },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    gap: 12,
+  },
+  toggleButtonActive: {
+    borderColor: theme.primary,
+    backgroundColor: theme.card,
+  },
+  toggleText: {
+    flex: 1,
+    fontSize: 16,
+    color: theme.textSecondary,
+    fontWeight: '500' as const,
+  },
+  toggleTextActive: {
+    color: theme.text,
+    fontWeight: '600' as const,
+  },
+  toggleCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleCheckActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
+  photoBox: {
+    width: (SCREEN_WIDTH - 56 - 20) / 3,
+    aspectRatio: 3 / 4,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.surface,
+  },
+  photoBoxFilled: {
+    borderStyle: 'solid',
+    borderColor: theme.primary,
+  },
+  photoPreview: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.card,
+  },
+  photoPreviewText: {
+    color: theme.textSecondary,
+    fontSize: 12,
+  },
+  photoRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  photoPlaceholderText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+});
