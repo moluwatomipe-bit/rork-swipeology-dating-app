@@ -49,14 +49,6 @@ export default function EditProfileScreen() {
     );
   }
 
-  if (!currentUser.phone_verified) {
-    router.replace({
-      pathname: '/(tabs)/profile/verify-phone',
-      params: { redirect: 'edit' },
-    });
-    return null;
-  }
-
   const handlePickPhoto = async (index: number) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({

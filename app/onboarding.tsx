@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,7 +48,7 @@ type DatingPrefOption = 'men' | 'women' | 'both';
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const { onboardingStep, goToStep, updateUser, login, completeRegistration, currentUser, isLoggingIn } = useAuth();
+  const { onboardingStep, goToStep, updateUser, login, completeRegistration, currentUser, isLoggingIn, lookupAccountByEmail, resetPassword } = useAuth();
   const { requestPermissions } = useNotifications();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -72,6 +73,14 @@ export default function OnboardingScreen() {
   const [loginEmail, setLoginEmail] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
+  const [forgotEmail, setForgotEmail] = useState<string>('');
+  const [forgotPhone, setForgotPhone] = useState<string>('');
+  const [forgotCode, setForgotCode] = useState<string>('');
+  const [forgotCodeSent, setForgotCodeSent] = useState<boolean>(false);
+  const [forgotNewPassword, setForgotNewPassword] = useState<string>('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState<string>('');
+  const [showForgotPassword, setShowForgotPassword] = useState<boolean>(false);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
 
   const animateTransition = useCallback((nextStep: OnboardingStep) => {
     Animated.timing(fadeAnim, {
@@ -403,11 +412,287 @@ export default function OnboardingScreen() {
       <TouchableOpacity
         onPress={() => {
           setError('');
+          animateTransition('forgot-password');
+        }}
+        activeOpacity={0.7}
+        testID="forgot-password-btn"
+      >
+        <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => {
+          setError('');
           animateTransition('phone-login');
         }}
         activeOpacity={0.7}
       >
         <Text style={styles.secondaryButtonText}>Create an account</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const MOCK_CODE = '123456';
+
+  const renderForgotPassword = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
+          <Lock size={28} color={theme.primary} />
+        </View>
+        <Text style={styles.stepTitle}>Reset password</Text>
+        <Text style={styles.stepDescription}>
+          Enter the email you used to sign up
+        </Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>School email</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="yourname@live.esu.edu"
+          placeholderTextColor={theme.textMuted}
+          value={forgotEmail}
+          onChangeText={(t) => { setForgotEmail(t); setError(''); }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          testID="forgot-email-input"
+        />
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={async () => {
+          if (!forgotEmail.trim()) {
+            setError('Please enter your email');
+            return;
+          }
+          setError('');
+          try {
+            const account = await lookupAccountByEmail(forgotEmail);
+            if (!account) {
+              setError('No account found with this email.');
+              return;
+            }
+            setForgotPhone(account.phone_number);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            animateTransition('forgot-verify-phone');
+          } catch (e) {
+            console.log('Lookup error:', e);
+            setError('Something went wrong. Please try again.');
+          }
+        }}
+        activeOpacity={0.8}
+        testID="forgot-continue-btn"
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.primaryButtonText}>Continue</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderForgotVerifyPhone = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <View style={[styles.stepIconCircle, { backgroundColor: '#EC489920' }]}>
+          <Phone size={28} color={theme.secondary} />
+        </View>
+        <Text style={styles.stepTitle}>Verify your phone</Text>
+        <Text style={styles.stepDescription}>
+          {forgotCodeSent
+            ? `Enter the 6-digit code sent to ${forgotPhone || 'your phone'}`
+            : `We'll send a code to ${forgotPhone || 'your phone number on file'}`}
+        </Text>
+      </View>
+
+      {!forgotCodeSent ? (
+        <View style={styles.forgotPhoneDisplay}>
+          <Phone size={18} color={theme.textSecondary} />
+          <Text style={styles.forgotPhoneText}>{forgotPhone || 'No phone number'}</Text>
+        </View>
+      ) : (
+        <View style={styles.inputGroup}>
+          <TextInput
+            style={styles.forgotCodeInput}
+            placeholder="000000"
+            placeholderTextColor={theme.textMuted}
+            value={forgotCode}
+            onChangeText={(text) => {
+              setForgotCode(text.replace(/[^0-9]/g, '').slice(0, 6));
+              setError('');
+            }}
+            keyboardType="number-pad"
+            maxLength={6}
+            autoFocus
+            testID="forgot-otp-input"
+          />
+        </View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => {
+          if (!forgotCodeSent) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setForgotCodeSent(true);
+            setError('');
+            console.log('OTP sent to:', forgotPhone);
+            return;
+          }
+          if (forgotCode.length < 6) {
+            setError('Please enter the 6-digit code');
+            return;
+          }
+          if (forgotCode !== MOCK_CODE) {
+            setError('Invalid code. Please try again. (Demo: use 123456)');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            return;
+          }
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          animateTransition('forgot-new-password');
+        }}
+        activeOpacity={0.8}
+        testID="forgot-verify-btn"
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.primaryButtonText}>
+            {forgotCodeSent ? 'Verify Code' : 'Send Code'}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {forgotCodeSent && (
+        <TouchableOpacity
+          onPress={() => {
+            setForgotCodeSent(false);
+            setForgotCode('');
+            setError('');
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.secondaryButtonText}>Resend code</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderForgotNewPassword = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
+          <Lock size={28} color={theme.primary} />
+        </View>
+        <Text style={styles.stepTitle}>Set new password</Text>
+        <Text style={styles.stepDescription}>
+          Create a new password for your account
+        </Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>New password</Text>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="At least 6 characters"
+            placeholderTextColor={theme.textMuted}
+            value={forgotNewPassword}
+            onChangeText={(t) => { setForgotNewPassword(t); setError(''); }}
+            secureTextEntry={!showForgotPassword}
+            testID="forgot-new-password-input"
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowForgotPassword(!showForgotPassword)}
+            activeOpacity={0.7}
+          >
+            {showForgotPassword ? (
+              <EyeOff size={20} color={theme.textMuted} />
+            ) : (
+              <Eye size={20} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Confirm new password</Text>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Re-enter new password"
+            placeholderTextColor={theme.textMuted}
+            value={forgotConfirmPassword}
+            onChangeText={(t) => { setForgotConfirmPassword(t); setError(''); }}
+            secureTextEntry={!showForgotPassword}
+            testID="forgot-confirm-password-input"
+          />
+        </View>
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={[styles.primaryButton, isResetting && styles.buttonDisabled]}
+        onPress={async () => {
+          if (forgotNewPassword.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+          }
+          if (forgotNewPassword !== forgotConfirmPassword) {
+            setError('Passwords do not match');
+            return;
+          }
+          setIsResetting(true);
+          try {
+            await resetPassword(forgotEmail, forgotNewPassword);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setForgotEmail('');
+            setForgotPhone('');
+            setForgotCode('');
+            setForgotCodeSent(false);
+            setForgotNewPassword('');
+            setForgotConfirmPassword('');
+            setError('');
+            animateTransition('login');
+            setTimeout(() => {
+              Alert.alert('Password Reset', 'Your password has been reset. You can now log in with your new password.');
+            }, 400);
+          } catch (e) {
+            console.log('Reset password error:', e);
+            setError('Failed to reset password. Please try again.');
+          } finally {
+            setIsResetting(false);
+          }
+        }}
+        activeOpacity={0.8}
+        disabled={isResetting}
+        testID="forgot-reset-btn"
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.primaryButtonText}>
+            {isResetting ? 'Resetting...' : 'Reset Password'}
+          </Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
@@ -1076,6 +1361,9 @@ export default function OnboardingScreen() {
       case 'bio-details': return renderBioDetails();
       case 'notifications': return renderNotifications();
       case 'tutorial': return renderTutorial();
+      case 'forgot-password': return renderForgotPassword();
+      case 'forgot-verify-phone': return renderForgotVerifyPhone();
+      case 'forgot-new-password': return renderForgotNewPassword();
       default: return renderWelcome();
     }
   };
@@ -1093,6 +1381,9 @@ export default function OnboardingScreen() {
     'notifications': 'bio-details',
     'tutorial': 'notifications',
     'phone-login': 'welcome',
+    'forgot-password': 'login',
+    'forgot-verify-phone': 'forgot-password',
+    'forgot-new-password': 'forgot-verify-phone',
   };
 
   return (
@@ -1502,5 +1793,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
     lineHeight: 21,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: theme.primary,
+    fontWeight: '600' as const,
+    paddingVertical: 8,
+  },
+  forgotPhoneDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: 24,
+    width: '100%',
+  },
+  forgotPhoneText: {
+    fontSize: 16,
+    color: theme.text,
+    fontWeight: '500' as const,
+  },
+  forgotCodeInput: {
+    backgroundColor: theme.inputBg,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    fontSize: 28,
+    color: theme.text,
+    borderWidth: 1,
+    borderColor: theme.border,
+    textAlign: 'center' as const,
+    letterSpacing: 12,
+    fontWeight: '700' as const,
   },
 });

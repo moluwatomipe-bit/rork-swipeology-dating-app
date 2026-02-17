@@ -248,6 +248,33 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     return doReportUser({ reportedId, reason, matchId });
   }, [doReportUser]);
 
+  const lookupAccountByEmail = useCallback(async (email: string): Promise<{ phone_number: string } | null> => {
+    const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+    const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
+    const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (!account) return null;
+    return { phone_number: account.user.phone_number || '' };
+  }, []);
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ email, newPassword }: { email: string; newPassword: string }) => {
+      const existingStr = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+      const accounts: StoredAccount[] = existingStr ? JSON.parse(existingStr) : [];
+      const idx = accounts.findIndex((a) => a.email.toLowerCase() === email.toLowerCase());
+      if (idx < 0) throw new Error('Account not found');
+      accounts[idx].password = newPassword;
+      accounts[idx].user.password = newPassword;
+      await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+      return true;
+    },
+  });
+
+  const { mutateAsync: doResetPassword } = resetPasswordMutation;
+
+  const resetPassword = useCallback(async (email: string, newPassword: string) => {
+    return doResetPassword({ email, newPassword });
+  }, [doResetPassword]);
+
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
       const email = currentUser?.school_email?.toLowerCase();
@@ -314,6 +341,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     changePassword,
     blockUser,
     reportUser,
+    lookupAccountByEmail,
+    resetPassword,
     isLoggingIn: loginMutation.isPending,
     loginError: loginMutation.error?.message ?? null,
     isLoading: loadStoredData.isLoading,

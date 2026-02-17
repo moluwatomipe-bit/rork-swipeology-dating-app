@@ -36,15 +36,8 @@ export default function ProfileScreen() {
 
   const handleEditProfile = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (!currentUser?.phone_verified) {
-      router.push({
-        pathname: '/(tabs)/profile/verify-phone',
-        params: { redirect: 'edit' },
-      });
-    } else {
-      router.push('/(tabs)/profile/edit');
-    }
-  }, [currentUser]);
+    router.push('/(tabs)/profile/edit');
+  }, []);
 
   const handleChangePassword = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -74,4 +74,7 @@ export type OnboardingStep =
   | 'bio-details'
   | 'notifications'
   | 'tutorial'
+  | 'forgot-password'
+  | 'forgot-verify-phone'
+  | 'forgot-new-password'
   | 'complete';
