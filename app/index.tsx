@@ -5,17 +5,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/colors';
 
 export default function Index() {
-  const { currentUser, onboardingStep, isReady } = useAuth();
+  const { currentUser, onboardingStep, isReady, session, hasProfile, profileChecked } = useAuth();
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || !profileChecked) return;
 
-    if (currentUser && onboardingStep === 'complete') {
+    console.log('[Nav] Routing decision - session:', !!session, 'hasProfile:', hasProfile, 'currentUser:', !!currentUser, 'step:', onboardingStep);
+
+    if (session && hasProfile && currentUser) {
+      console.log('[Nav] Profile exists, going to main app');
       router.replace('/(tabs)/swipe' as any);
-    } else {
+    } else if (session && hasProfile === false) {
+      console.log('[Nav] Logged in but no profile, going to onboarding');
+      router.replace('/onboarding' as any);
+    } else if (!session) {
+      console.log('[Nav] No session, going to onboarding');
       router.replace('/onboarding' as any);
     }
-  }, [isReady, currentUser, onboardingStep]);
+  }, [isReady, profileChecked, session, hasProfile, currentUser, onboardingStep]);
 
   return (
     <View style={styles.container}>

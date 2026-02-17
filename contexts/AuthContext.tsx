@@ -15,7 +15,63 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const [session, setSession] = useState<Session | null>(null);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('welcome');
   const [isReady, setIsReady] = useState<boolean>(false);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  const [profileChecked, setProfileChecked] = useState<boolean>(false);
   const queryClient = useQueryClient();
+
+  const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
+    console.log('[Auth] Checking profiles table for user:', userId);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.log('[Auth] Profile lookup error:', error.message);
+        return null;
+      }
+
+      if (data) {
+        console.log('[Auth] Profile found for user:', userId);
+        const profile: User = {
+          id: data.id ?? userId,
+          phone_number: data.phone_number ?? '',
+          phone_verified: data.phone_verified ?? false,
+          school_email: data.school_email ?? '',
+          password: '',
+          university: data.university ?? '',
+          is_verified_esu: data.is_verified_esu ?? false,
+          first_name: data.first_name ?? '',
+          age: data.age ?? 0,
+          gender: data.gender ?? 'prefer not to say',
+          pronouns: data.pronouns ?? '',
+          dating_preference: data.dating_preference ?? 'both',
+          wants_friends: data.wants_friends ?? false,
+          wants_dating: data.wants_dating ?? false,
+          photo1_url: data.photo1_url ?? '',
+          photo2_url: data.photo2_url ?? '',
+          photo3_url: data.photo3_url ?? '',
+          photo4_url: data.photo4_url ?? '',
+          photo5_url: data.photo5_url ?? '',
+          photo6_url: data.photo6_url ?? '',
+          bio: data.bio ?? '',
+          major: data.major ?? '',
+          class_year: data.class_year ?? '',
+          interests: data.interests ?? '',
+          blocked_users: data.blocked_users ?? [],
+        };
+        return profile;
+      }
+
+      console.log('[Auth] No profile found for user:', userId);
+      return null;
+    } catch (err) {
+      console.log('[Auth] Profile fetch exception:', err);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -26,10 +82,42 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       console.log('[Auth] Auth state changed:', _event, s?.user?.email ?? 'none');
       setSession(s);
+      if (!s) {
+        setHasProfile(null);
+        setProfileChecked(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setProfileChecked(true);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const profile = await fetchProfile(session.user.id);
+      if (cancelled) return;
+
+      if (profile) {
+        setCurrentUser(profile);
+        setHasProfile(true);
+        setOnboardingStep('complete');
+        await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
+        await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
+        console.log('[Auth] Profile loaded from Supabase, skipping onboarding');
+      } else {
+        setHasProfile(false);
+        console.log('[Auth] No profile in Supabase, user needs onboarding');
+      }
+      setProfileChecked(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [session?.user?.id, fetchProfile]);
 
   const loadStoredData = useQuery({
     queryKey: ['auth', 'stored'],
@@ -46,18 +134,22 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   });
 
   useEffect(() => {
-    if (loadStoredData.data) {
-      const user = loadStoredData.data.user;
-      if (user) {
-        if (user.phone_verified === undefined) user.phone_verified = false;
-        if (user.pronouns === undefined) user.pronouns = '';
-        if (user.blocked_users === undefined) user.blocked_users = [];
+    if (loadStoredData.data && profileChecked) {
+      if (!currentUser && !hasProfile) {
+        const user = loadStoredData.data.user;
+        if (user) {
+          if (user.phone_verified === undefined) user.phone_verified = false;
+          if (user.pronouns === undefined) user.pronouns = '';
+          if (user.blocked_users === undefined) user.blocked_users = [];
+          setCurrentUser(user);
+        }
+        if (!hasProfile) {
+          setOnboardingStep(loadStoredData.data.step);
+        }
       }
-      setCurrentUser(user);
-      setOnboardingStep(loadStoredData.data.step);
       setIsReady(true);
     }
-  }, [loadStoredData.data]);
+  }, [loadStoredData.data, profileChecked, hasProfile, currentUser]);
 
   const saveUserMutation = useMutation({
     mutationFn: async (user: User) => {
@@ -130,18 +222,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         throw new Error(error.message);
       }
       console.log('[Auth] Login success:', data.user?.id);
-
-      const storedUserStr = await AsyncStorage.getItem(STORAGE_KEY_USER);
-      if (storedUserStr) {
-        const user = JSON.parse(storedUserStr) as User;
-        if (user.phone_verified === undefined) user.phone_verified = false;
-        if (user.pronouns === undefined) user.pronouns = '';
-        if (user.blocked_users === undefined) user.blocked_users = [];
-        setCurrentUser(user);
-        setOnboardingStep('complete');
-        await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
-        return user;
-      }
 
       return null;
     },
@@ -340,5 +420,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     loginError: loginMutation.error?.message ?? null,
     signUpError: signUpMutation.error?.message ?? null,
     isLoading: loadStoredData.isLoading,
+    hasProfile,
+    profileChecked,
   };
 });
