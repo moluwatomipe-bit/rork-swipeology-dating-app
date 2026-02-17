@@ -1,5 +1,4 @@
-import { supabase } from '@/constants/supabase';
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +12,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -37,8 +36,6 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotifications } from '@/contexts/NotificationContext';
-import { OnboardingStep, User } from '@/types';
 import Colors from '@/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -49,276 +46,72 @@ type DatingPrefOption = 'men' | 'women' | 'both';
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const { onboardingStep, goToStep, updateUser, completeRegistration, currentUser, isLoggingIn, lookupAccountByEmail, resetPassword } = useAuth();
-  const { requestPermissions } = useNotifications();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  // Auth functions
+  const { signUp, signIn, resetPassword, user } = useAuth();
 
-  const [schoolEmail, setSchoolEmail] = useState<string>('');
-  const [firstName, setFirstName] = useState<string>('');
-  const [age, setAge] = useState<string>('');
-  const [gender, setGender] = useState<GenderOption | null>(null);
-  const [datingPreference, setDatingPreference] = useState<DatingPrefOption | null>(null);
-  const [wantsFriends, setWantsFriends] = useState<boolean>(false);
-  const [wantsDating, setWantsDating] = useState<boolean>(false);
-  const [photos, setPhotos] = useState<string[]>(['', '', '', '', '', '']);
-  const [bio, setBio] = useState<string>('');
-  const [major, setMajor] = useState<string>('');
-  const [classYear, setClassYear] = useState<string>('');
-  const [interests, setInterests] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [confirmPassword, setConfirmPassword] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [loginEmail, setLoginEmail] = useState<string>('');
-  const [loginPassword, setLoginPassword] = useState<string>('');
-  const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
-  const [forgotEmail, setForgotEmail] = useState<string>('');
-  const [forgotPhone, setForgotPhone] = useState<string>('');
-  const [forgotCode, setForgotCode] = useState<string>('');
-  const [forgotCodeSent, setForgotCodeSent] = useState<boolean>(false);
-  const [forgotNewPassword, setForgotNewPassword] = useState<string>('');
-  const [forgotConfirmPassword, setForgotConfirmPassword] = useState<string>('');
-  const [showForgotPassword, setShowForgotPassword] = useState<boolean>(false);
-  const [isResetting, setIsResetting] = useState<boolean>(false);
+  // Step navigation
+  const [onboardingStep, setOnboardingStep] = useState<'login' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial'>('login');
 
-  const animateTransition = useCallback((nextStep: OnboardingStep) => {
+  const animateTransition = (next: typeof onboardingStep) => {
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 150,
       useNativeDriver: true,
     }).start(() => {
-      setError('');
-      goToStep(nextStep);
+      setOnboardingStep(next);
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 250,
+        duration: 150,
         useNativeDriver: true,
       }).start();
     });
-  }, [fadeAnim, goToStep]);
+  };
 
-  const handlePickPhoto = useCallback(async (index: number) => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [3, 4],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        const newPhotos = [...photos];
-        newPhotos[index] = result.assets[0].uri;
-        setPhotos(newPhotos);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (e) {
-      console.log('Photo picker error:', e);
+  // Form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+
+  const [schoolEmail, setSchoolEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [firstName, setFirstName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState<GenderOption | null>(null);
+  const [datingPreference, setDatingPreference] = useState<DatingPrefOption | null>(null);
+  const [wantsFriends, setWantsFriends] = useState(false);
+  const [wantsDating, setWantsDating] = useState(false);
+
+  const [photos, setPhotos] = useState<string[]>(['', '', '', '', '', '']);
+  const [bio, setBio] = useState('');
+  const [major, setMajor] = useState('');
+  const [classYear, setClassYear] = useState('');
+  const [interests, setInterests] = useState('');
+
+  const [error, setError] = useState('');
+
+  // Photo picker
+  const handlePickPhoto = async (index: number) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const updated = [...photos];
+      updated[index] = result.assets[0].uri;
+      setPhotos(updated);
     }
-  }, [photos]);
-
-  const renderWelcome = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.welcomeHeader}>
-        <LinearGradient
-          colors={['#A855F7', '#D946EF', '#EC4899']}
-          style={styles.logoCircle}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Heart size={48} color="#fff" fill="#fff" />
-        </LinearGradient>
-        <Text style={styles.welcomeTitle}>Swipeology</Text>
-        <Text style={styles.welcomeSubtitle}>
-          Meet friends and date safely with students from your university.
-        </Text>
-      </View>
-
-      <View style={styles.bulletContainer}>
-        <View style={styles.bulletRow}>
-          <View style={[styles.bulletIcon, { backgroundColor: '#A855F720' }]}>
-            <Shield size={20} color={theme.primary} />
-          </View>
-          <Text style={styles.bulletText}>
-            Only confirmed students from East Stroudsburg University
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={[styles.bulletIcon, { backgroundColor: '#EC489920' }]}>
-            <Users size={20} color={theme.secondary} />
-          </View>
-          <Text style={styles.bulletText}>
-            Friends and Dating sections in one app
-          </Text>
-        </View>
-        <View style={styles.bulletRow}>
-          <View style={[styles.bulletIcon, { backgroundColor: '#F9A8D420' }]}>
-            <Sparkles size={20} color={theme.accent} />
-          </View>
-          <Text style={styles.bulletText}>
-            Swipe to match, then chat
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.bottomActions}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            animateTransition('phone-login');
-          }}
-          activeOpacity={0.8}
-          testID="get-started-btn"
-        >
-          <LinearGradient
-            colors={['#A855F7', '#EC4899']}
-            style={styles.buttonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.primaryButtonText}>Get Started</Text>
-            <ChevronRight size={20} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            animateTransition('login');
-          }}
-          activeOpacity={0.7}
-          testID="login-btn"
-        >
-          <Text style={styles.secondaryButtonText}>Log In</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderPhoneLogin = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <View style={[styles.stepIconCircle, { backgroundColor: '#EC489920' }]}>
-          <Phone size={28} color={theme.secondary} />
-        </View>
-        <Text style={styles.stepTitle}>Verify your phone</Text>
-        <Text style={styles.stepDescription}>
-          We&apos;ll send you a verification code
-        </Text>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Phone number</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="+1 (570) 000-0000"
-          placeholderTextColor={theme.textMuted}
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-          keyboardType="phone-pad"
-          testID="phone-input"
-        />
-      </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={() => {
-          if (!phoneNumber.trim()) {
-            setError('Please enter your phone number');
-            return;
-          }
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          const userId = `user_${Date.now()}`;
-          updateUser({
-            id: userId,
-            phone_number: phoneNumber,
-          } as User);
-          animateTransition('esu-email');
-        }}
-        activeOpacity={0.8}
-        testID="send-code-btn"
-      >
-        <LinearGradient
-          colors={['#A855F7', '#EC4899']}
-          style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <Text style={styles.primaryButtonText}>Continue</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderEsuEmail = () => (
-    <ScrollView style={styles.scrollStep} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-      <View style={styles.stepHeader}>
-        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
-          <Shield size={28} color={theme.primary} />
-        </View>
-        <Text style={styles.stepTitle}>Verify your school</Text>
-      </View>
-
-      <View style={styles.infoCard}>
-        <Text style={styles.infoText}>
-          Swipeology is only for East Stroudsburg University students.
-        </Text>
-        <Text style={styles.infoText}>
-          Use your ESU email to get access.
-        </Text>
-        <Text style={[styles.infoText, { color: theme.textMuted, fontSize: 13 }]}>
-          We never sell your email or share it with ESU. Swipeology is not affiliated with or endorsed by East Stroudsburg University.
-        </Text>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>School email</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="yourname@live.esu.edu"
-          placeholderTextColor={theme.textMuted}
-          value={schoolEmail}
-          onChangeText={setSchoolEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          testID="email-input"
-        />
-      </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={() => {
-          if (!schoolEmail.endsWith('@live.esu.edu')) {
-            setError('Please use your ESU student email ending in @live.esu.edu.');
-            return;
-          }
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          updateUser({
-            school_email: schoolEmail,
-            university: 'East Stroudsburg University',
-            is_verified_esu: true,
-          } as User);
-          animateTransition('create-password');
-        }}
-        activeOpacity={0.8}
-        testID="verify-email-btn"
-      >
-        <LinearGradient
-          colors={['#A855F7', '#EC4899']}
-          style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <Text style={styles.primaryButtonText}>Continue</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-
+  };
+  // -----------------------------
+  // LOGIN SCREEN
+  // -----------------------------
   const renderLogin = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -341,7 +134,6 @@ export default function OnboardingScreen() {
           onChangeText={setLoginEmail}
           keyboardType="email-address"
           autoCapitalize="none"
-          testID="login-email-input"
         />
       </View>
 
@@ -355,7 +147,6 @@ export default function OnboardingScreen() {
             value={loginPassword}
             onChangeText={setLoginPassword}
             secureTextEntry={!showLoginPassword}
-            testID="login-password-input"
           />
           <TouchableOpacity
             style={styles.eyeButton}
@@ -374,54 +165,43 @@ export default function OnboardingScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
-  style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
-  onPress={async () => {
-    if (!loginEmail.trim()) {
-      setError('Please enter your email');
-      return;
-    }
-    if (!loginPassword.trim()) {
-      setError('Please enter your password');
-      return;
-    }
+        style={styles.primaryButton}
+        onPress={async () => {
+          if (!loginEmail.trim()) {
+            setError('Please enter your email');
+            return;
+          }
+          if (!loginPassword.trim()) {
+            setError('Please enter your password');
+            return;
+          }
 
-    setError('');
+          setError('');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          const { user, error: loginErr } = await signIn(
+            loginEmail.trim(),
+            loginPassword.trim()
+          );
 
-      const { data, error: supaError } = await supabase.auth.signInWithPassword({
-        email: loginEmail.trim(),
-        password: loginPassword.trim(),
-      });
+          if (loginErr) {
+            setError(loginErr);
+            return;
+          }
 
-      if (supaError) {
-        setError(supaError.message);
-        return;
-      }
-
-      router.replace('/(tabs)/swipe');
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Login failed. Please try again.';
-      setError(msg);
-    }
-  }}
-  activeOpacity={0.8}
-  disabled={isLoggingIn}
-  testID="login-submit-btn"
->
-  <LinearGradient
-    colors={['#A855F7', '#EC4899']}
-    style={styles.buttonGradient}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 0 }}
-  >
-    <Text style={styles.primaryButtonText}>
-      {isLoggingIn ? 'Logging in...' : 'Log In'}
-    </Text>
-  </LinearGradient>
-</TouchableOpacity>
-
+          router.replace('/(tabs)/swipe');
+        }}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.primaryButtonText}>Log In</Text>
+        </LinearGradient>
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => {
@@ -429,7 +209,6 @@ export default function OnboardingScreen() {
           animateTransition('forgot-password');
         }}
         activeOpacity={0.7}
-        testID="forgot-password-btn"
       >
         <Text style={styles.forgotPasswordText}>Forgot password?</Text>
       </TouchableOpacity>
@@ -446,8 +225,9 @@ export default function OnboardingScreen() {
     </View>
   );
 
-  const MOCK_CODE = '123456';
-
+  // -----------------------------
+  // FORGOT PASSWORD (SUPABASE EMAIL RESET)
+  // -----------------------------
   const renderForgotPassword = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -456,7 +236,7 @@ export default function OnboardingScreen() {
         </View>
         <Text style={styles.stepTitle}>Reset password</Text>
         <Text style={styles.stepDescription}>
-          Enter the email you used to sign up
+          Enter your ESU email and we’ll send a reset link
         </Text>
       </View>
 
@@ -466,11 +246,13 @@ export default function OnboardingScreen() {
           style={styles.textInput}
           placeholder="yourname@live.esu.edu"
           placeholderTextColor={theme.textMuted}
-          value={forgotEmail}
-          onChangeText={(t) => { setForgotEmail(t); setError(''); }}
+          value={loginEmail}
+          onChangeText={(t) => {
+            setLoginEmail(t);
+            setError('');
+          }}
           keyboardType="email-address"
           autoCapitalize="none"
-          testID="forgot-email-input"
         />
       </View>
 
@@ -479,27 +261,27 @@ export default function OnboardingScreen() {
       <TouchableOpacity
         style={styles.primaryButton}
         onPress={async () => {
-          if (!forgotEmail.trim()) {
+          if (!loginEmail.trim()) {
             setError('Please enter your email');
             return;
           }
-          setError('');
-          try {
-            const account = await lookupAccountByEmail(forgotEmail);
-            if (!account) {
-              setError('No account found with this email.');
-              return;
-            }
-            setForgotPhone(account.phone_number);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            animateTransition('forgot-verify-phone');
-          } catch (e) {
-            console.log('Lookup error:', e);
-            setError('Something went wrong. Please try again.');
+
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+          const err = await resetPassword(loginEmail.trim());
+          if (err) {
+            setError(err);
+            return;
           }
+
+          Alert.alert(
+            'Reset Email Sent',
+            'Check your inbox for a password reset link.'
+          );
+
+          animateTransition('login');
         }}
         activeOpacity={0.8}
-        testID="forgot-continue-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
@@ -507,210 +289,140 @@ export default function OnboardingScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.primaryButtonText}>Continue</Text>
+          <Text style={styles.primaryButtonText}>Send Reset Link</Text>
         </LinearGradient>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => animateTransition('login')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.secondaryButtonText}>Back to login</Text>
       </TouchableOpacity>
     </View>
   );
-
-  const renderForgotVerifyPhone = () => (
+  // -----------------------------
+  // PHONE LOGIN (FIRST SIGNUP STEP)
+  // -----------------------------
+  const renderPhoneLogin = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
         <View style={[styles.stepIconCircle, { backgroundColor: '#EC489920' }]}>
           <Phone size={28} color={theme.secondary} />
         </View>
-        <Text style={styles.stepTitle}>Verify your phone</Text>
+        <Text style={styles.stepTitle}>Let’s get started</Text>
         <Text style={styles.stepDescription}>
-          {forgotCodeSent
-            ? `Enter the 6-digit code sent to ${forgotPhone || 'your phone'}`
-            : `We'll send a code to ${forgotPhone || 'your phone number on file'}`}
+          Enter your phone number (optional)
         </Text>
       </View>
 
-      {!forgotCodeSent ? (
-        <View style={styles.forgotPhoneDisplay}>
-          <Phone size={18} color={theme.textSecondary} />
-          <Text style={styles.forgotPhoneText}>{forgotPhone || 'No phone number'}</Text>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Phone number</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="(555) 123‑4567"
+          placeholderTextColor={theme.textMuted}
+          keyboardType="phone-pad"
+          value={''} // phone is optional and not stored in Supabase
+          onChangeText={() => {}}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          animateTransition('esu-email');
+        }}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+        >
+          <Text style={styles.primaryButtonText}>Continue</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => animateTransition('login')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.secondaryButtonText}>Back to login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // -----------------------------
+  // ESU EMAIL STEP
+  // -----------------------------
+  const renderEsuEmail = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
+          <Mail size={28} color={theme.primary} />
         </View>
-      ) : (
-        <View style={styles.inputGroup}>
-          <TextInput
-            style={styles.forgotCodeInput}
-            placeholder="000000"
-            placeholderTextColor={theme.textMuted}
-            value={forgotCode}
-            onChangeText={(text) => {
-              setForgotCode(text.replace(/[^0-9]/g, '').slice(0, 6));
-              setError('');
-            }}
-            keyboardType="number-pad"
-            maxLength={6}
-            autoFocus
-            testID="forgot-otp-input"
-          />
-        </View>
-      )}
+        <Text style={styles.stepTitle}>Your ESU email</Text>
+        <Text style={styles.stepDescription}>
+          You must use your @live.esu.edu email to sign up
+        </Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>School email</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="yourname@live.esu.edu"
+          placeholderTextColor={theme.textMuted}
+          value={schoolEmail}
+          onChangeText={(t) => {
+            setSchoolEmail(t);
+            setError('');
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
         style={styles.primaryButton}
         onPress={() => {
-          if (!forgotCodeSent) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setForgotCodeSent(true);
-            setError('');
-            console.log('OTP sent to:', forgotPhone);
+          if (!schoolEmail.trim()) {
+            setError('Please enter your ESU email');
             return;
           }
-          if (forgotCode.length < 6) {
-            setError('Please enter the 6-digit code');
+          if (!schoolEmail.endsWith('@live.esu.edu')) {
+            setError('You must use your @live.esu.edu email');
             return;
           }
-          if (forgotCode !== MOCK_CODE) {
-            setError('Invalid code. Please try again. (Demo: use 123456)');
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            return;
-          }
+
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          animateTransition('forgot-new-password');
+          animateTransition('create-password');
         }}
         activeOpacity={0.8}
-        testID="forgot-verify-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.primaryButtonText}>
-            {forgotCodeSent ? 'Verify Code' : 'Send Code'}
-          </Text>
+          <Text style={styles.primaryButtonText}>Continue</Text>
         </LinearGradient>
       </TouchableOpacity>
-
-      {forgotCodeSent && (
-        <TouchableOpacity
-          onPress={() => {
-            setForgotCodeSent(false);
-            setForgotCode('');
-            setError('');
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.secondaryButtonText}>Resend code</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  const renderForgotNewPassword = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
-          <Lock size={28} color={theme.primary} />
-        </View>
-        <Text style={styles.stepTitle}>Set new password</Text>
-        <Text style={styles.stepDescription}>
-          Create a new password for your account
-        </Text>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>New password</Text>
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="At least 6 characters"
-            placeholderTextColor={theme.textMuted}
-            value={forgotNewPassword}
-            onChangeText={(t) => { setForgotNewPassword(t); setError(''); }}
-            secureTextEntry={!showForgotPassword}
-            testID="forgot-new-password-input"
-          />
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => setShowForgotPassword(!showForgotPassword)}
-            activeOpacity={0.7}
-          >
-            {showForgotPassword ? (
-              <EyeOff size={20} color={theme.textMuted} />
-            ) : (
-              <Eye size={20} color={theme.textMuted} />
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Confirm new password</Text>
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="Re-enter new password"
-            placeholderTextColor={theme.textMuted}
-            value={forgotConfirmPassword}
-            onChangeText={(t) => { setForgotConfirmPassword(t); setError(''); }}
-            secureTextEntry={!showForgotPassword}
-            testID="forgot-confirm-password-input"
-          />
-        </View>
-      </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={[styles.primaryButton, isResetting && styles.buttonDisabled]}
-        onPress={async () => {
-          if (forgotNewPassword.length < 6) {
-            setError('Password must be at least 6 characters');
-            return;
-          }
-          if (forgotNewPassword !== forgotConfirmPassword) {
-            setError('Passwords do not match');
-            return;
-          }
-          setIsResetting(true);
-          try {
-            await resetPassword(forgotEmail, forgotNewPassword);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setForgotEmail('');
-            setForgotPhone('');
-            setForgotCode('');
-            setForgotCodeSent(false);
-            setForgotNewPassword('');
-            setForgotConfirmPassword('');
-            setError('');
-            animateTransition('login');
-            setTimeout(() => {
-              Alert.alert('Password Reset', 'Your password has been reset. You can now log in with your new password.');
-            }, 400);
-          } catch (e) {
-            console.log('Reset password error:', e);
-            setError('Failed to reset password. Please try again.');
-          } finally {
-            setIsResetting(false);
-          }
-        }}
-        activeOpacity={0.8}
-        disabled={isResetting}
-        testID="forgot-reset-btn"
+        onPress={() => animateTransition('phone-login')}
+        activeOpacity={0.7}
       >
-        <LinearGradient
-          colors={['#A855F7', '#EC4899']}
-          style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isResetting ? 'Resetting...' : 'Reset Password'}
-          </Text>
-        </LinearGradient>
+        <Text style={styles.secondaryButtonText}>Back</Text>
       </TouchableOpacity>
     </View>
   );
 
+  // -----------------------------
+  // CREATE PASSWORD (SUPABASE SIGNUP)
+  // -----------------------------
   const renderCreatePassword = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -719,7 +431,7 @@ export default function OnboardingScreen() {
         </View>
         <Text style={styles.stepTitle}>Create a password</Text>
         <Text style={styles.stepDescription}>
-          You&apos;ll use this to log back in
+          You’ll use this to log back in
         </Text>
       </View>
 
@@ -731,9 +443,11 @@ export default function OnboardingScreen() {
             placeholder="At least 6 characters"
             placeholderTextColor={theme.textMuted}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(t) => {
+              setPassword(t);
+              setError('');
+            }}
             secureTextEntry={!showPassword}
-            testID="password-input"
           />
           <TouchableOpacity
             style={styles.eyeButton}
@@ -757,9 +471,11 @@ export default function OnboardingScreen() {
             placeholder="Re-enter your password"
             placeholderTextColor={theme.textMuted}
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(t) => {
+              setConfirmPassword(t);
+              setError('');
+            }}
             secureTextEntry={!showPassword}
-            testID="confirm-password-input"
           />
         </View>
       </View>
@@ -768,7 +484,7 @@ export default function OnboardingScreen() {
 
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => {
+        onPress={async () => {
           if (password.length < 6) {
             setError('Password must be at least 6 characters');
             return;
@@ -777,25 +493,46 @@ export default function OnboardingScreen() {
             setError('Passwords do not match');
             return;
           }
+
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          updateUser({ password } as User);
+
+          // SUPABASE SIGNUP
+          const { user: newUser, error: signUpErr } = await signUp(
+            schoolEmail.trim(),
+            password.trim(),
+            {
+              onboarding_started: true,
+            }
+          );
+
+          if (signUpErr) {
+            setError(signUpErr);
+            return;
+          }
+
           animateTransition('name-age');
         }}
         activeOpacity={0.8}
-        testID="password-continue-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
           <Text style={styles.primaryButtonText}>Continue</Text>
         </LinearGradient>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => animateTransition('esu-email')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.secondaryButtonText}>Back</Text>
+      </TouchableOpacity>
     </View>
   );
-
+  // -----------------------------
+  // NAME + AGE
+  // -----------------------------
   const renderNameAge = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -812,8 +549,10 @@ export default function OnboardingScreen() {
           placeholder="Your first name"
           placeholderTextColor={theme.textMuted}
           value={firstName}
-          onChangeText={setFirstName}
-          testID="name-input"
+          onChangeText={(t) => {
+            setFirstName(t);
+            setError('');
+          }}
         />
       </View>
 
@@ -824,9 +563,11 @@ export default function OnboardingScreen() {
           placeholder="18"
           placeholderTextColor={theme.textMuted}
           value={age}
-          onChangeText={setAge}
+          onChangeText={(t) => {
+            setAge(t);
+            setError('');
+          }}
           keyboardType="number-pad"
-          testID="age-input"
         />
       </View>
 
@@ -839,23 +580,21 @@ export default function OnboardingScreen() {
             setError('Please enter your first name');
             return;
           }
+
           const ageNum = parseInt(age, 10);
           if (isNaN(ageNum) || ageNum < 18) {
             setError('You must be 18 or older to use Swipeology.');
             return;
           }
+
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          updateUser({ first_name: firstName, age: ageNum } as User);
           animateTransition('gender');
         }}
         activeOpacity={0.8}
-        testID="name-age-continue-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
           <Text style={styles.primaryButtonText}>Continue</Text>
         </LinearGradient>
@@ -863,6 +602,9 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  // -----------------------------
+  // GENDER
+  // -----------------------------
   const renderGender = () => {
     const options: { label: string; value: GenderOption }[] = [
       { label: 'Man', value: 'man' },
@@ -874,7 +616,7 @@ export default function OnboardingScreen() {
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepHeader}>
-          <Text style={styles.stepTitle}>What&apos;s your gender?</Text>
+          <Text style={styles.stepTitle}>What’s your gender?</Text>
         </View>
 
         <View style={styles.optionsContainer}>
@@ -888,9 +630,9 @@ export default function OnboardingScreen() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setGender(opt.value);
+                setError('');
               }}
               activeOpacity={0.7}
-              testID={`gender-${opt.value}`}
             >
               <Text
                 style={[
@@ -914,19 +656,16 @@ export default function OnboardingScreen() {
               setError('Please select your gender');
               return;
             }
+
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            updateUser({ gender } as User);
             animateTransition('dating-preference');
           }}
           activeOpacity={0.8}
           disabled={!gender}
-          testID="gender-continue-btn"
         >
           <LinearGradient
             colors={gender ? ['#A855F7', '#EC4899'] : ['#444', '#555']}
             style={styles.buttonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
           >
             <Text style={styles.primaryButtonText}>Continue</Text>
           </LinearGradient>
@@ -935,6 +674,9 @@ export default function OnboardingScreen() {
     );
   };
 
+  // -----------------------------
+  // DATING PREFERENCE
+  // -----------------------------
   const renderDatingPreference = () => {
     const options: { label: string; value: DatingPrefOption }[] = [
       { label: 'Men', value: 'men' },
@@ -959,9 +701,9 @@ export default function OnboardingScreen() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setDatingPreference(opt.value);
+                setError('');
               }}
               activeOpacity={0.7}
-              testID={`pref-${opt.value}`}
             >
               <Text
                 style={[
@@ -985,19 +727,16 @@ export default function OnboardingScreen() {
               setError('Please select a preference');
               return;
             }
+
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            updateUser({ dating_preference: datingPreference } as User);
             animateTransition('intent');
           }}
           activeOpacity={0.8}
           disabled={!datingPreference}
-          testID="pref-continue-btn"
         >
           <LinearGradient
             colors={datingPreference ? ['#A855F7', '#EC4899'] : ['#444', '#555']}
             style={styles.buttonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
           >
             <Text style={styles.primaryButtonText}>Continue</Text>
           </LinearGradient>
@@ -1006,6 +745,9 @@ export default function OnboardingScreen() {
     );
   };
 
+  // -----------------------------
+  // INTENT (FRIENDS / DATING)
+  // -----------------------------
   const renderIntent = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -1019,9 +761,9 @@ export default function OnboardingScreen() {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setWantsFriends(!wantsFriends);
+            setError('');
           }}
           activeOpacity={0.7}
-          testID="toggle-friends"
         >
           <Users size={24} color={wantsFriends ? '#fff' : theme.secondary} />
           <Text style={[styles.toggleText, wantsFriends && styles.toggleTextActive]}>
@@ -1037,9 +779,9 @@ export default function OnboardingScreen() {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setWantsDating(!wantsDating);
+            setError('');
           }}
           activeOpacity={0.7}
-          testID="toggle-dating"
         >
           <Heart size={24} color={wantsDating ? '#fff' : theme.primary} />
           <Text style={[styles.toggleText, wantsDating && styles.toggleTextActive]}>
@@ -1060,25 +802,24 @@ export default function OnboardingScreen() {
             setError('Please choose at least friends, dating, or both.');
             return;
           }
+
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          updateUser({ wants_friends: wantsFriends, wants_dating: wantsDating } as User);
           animateTransition('photos');
         }}
         activeOpacity={0.8}
-        testID="intent-continue-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
           <Text style={styles.primaryButtonText}>Continue</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>
   );
-
+  // -----------------------------
+  // PHOTOS
+  // -----------------------------
   const renderPhotos = () => (
     <ScrollView style={styles.scrollStep} contentContainerStyle={styles.scrollContent}>
       <View style={styles.stepHeader}>
@@ -1093,7 +834,6 @@ export default function OnboardingScreen() {
             style={[styles.photoBox, photo ? styles.photoBoxFilled : null]}
             onPress={() => handlePickPhoto(index)}
             activeOpacity={0.7}
-            testID={`photo-${index}`}
           >
             {photo ? (
               <View style={styles.photoPreview}>
@@ -1122,128 +862,103 @@ export default function OnboardingScreen() {
             setError('Please add at least one photo');
             return;
           }
+
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          updateUser({
-            photo1_url: photos[0] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=600&fit=crop',
-            photo2_url: photos[1],
-            photo3_url: photos[2],
-            photo4_url: photos[3],
-            photo5_url: photos[4],
-            photo6_url: photos[5],
-          } as User);
           animateTransition('bio-details');
         }}
         activeOpacity={0.8}
-        testID="photos-continue-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
           <Text style={styles.primaryButtonText}>Continue</Text>
         </LinearGradient>
       </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.skipPhotoButton}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          updateUser({
-            photo1_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=600&fit=crop',
-            photo2_url: '',
-            photo3_url: '',
-            photo4_url: '',
-            photo5_url: '',
-            photo6_url: '',
-          } as User);
-          animateTransition('bio-details');
-        }}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.skipPhotoText}>Use default photo for now</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 
+  // -----------------------------
+  // BIO DETAILS
+  // -----------------------------
   const renderBioDetails = () => (
-    <ScrollView style={styles.scrollStep} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.scrollStep} contentContainerStyle={styles.scrollContent}>
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>Add a short bio</Text>
+        <Text style={styles.stepTitle}>Tell us more</Text>
+        <Text style={styles.stepDescription}>This helps people get to know you</Text>
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Bio</Text>
         <TextInput
-          style={[styles.textInput, styles.textArea]}
-          placeholder="Tell people about yourself..."
+          style={[styles.textInput, { height: 100 }]}
+          placeholder="Write a short bio..."
           placeholderTextColor={theme.textMuted}
           value={bio}
-          onChangeText={setBio}
+          onChangeText={(t) => {
+            setBio(t);
+            setError('');
+          }}
           multiline
-          numberOfLines={4}
-          testID="bio-input"
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Major (optional)</Text>
+        <Text style={styles.inputLabel}>Major</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="e.g., Biology"
+          placeholder="Your major"
           placeholderTextColor={theme.textMuted}
           value={major}
-          onChangeText={setMajor}
-          testID="major-input"
+          onChangeText={(t) => {
+            setMajor(t);
+            setError('');
+          }}
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Class year (optional)</Text>
+        <Text style={styles.inputLabel}>Class year</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="e.g., 2026"
+          placeholder="2026"
           placeholderTextColor={theme.textMuted}
           value={classYear}
-          onChangeText={setClassYear}
+          onChangeText={(t) => {
+            setClassYear(t);
+            setError('');
+          }}
           keyboardType="number-pad"
-          testID="class-year-input"
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Interests (optional)</Text>
+        <Text style={styles.inputLabel}>Interests</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="hiking, coffee, music..."
+          placeholder="Hiking, music, gaming..."
           placeholderTextColor={theme.textMuted}
           value={interests}
-          onChangeText={setInterests}
-          testID="interests-input"
+          onChangeText={(t) => {
+            setInterests(t);
+            setError('');
+          }}
         />
       </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
         style={styles.primaryButton}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          updateUser({
-            bio,
-            major,
-            class_year: classYear,
-            interests,
-          } as User);
           animateTransition('notifications');
         }}
         activeOpacity={0.8}
-        testID="bio-continue-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
           <Text style={styles.primaryButtonText}>Continue</Text>
         </LinearGradient>
@@ -1251,119 +966,161 @@ export default function OnboardingScreen() {
     </ScrollView>
   );
 
+  // -----------------------------
+  // NOTIFICATIONS
+  // -----------------------------
   const renderNotifications = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <View style={[styles.stepIconCircle, { backgroundColor: '#F9A8D420' }]}>
-          <Bell size={28} color={theme.accent} />
-        </View>
-        <Text style={styles.stepTitle}>Stay in the loop</Text>
+        <Bell size={28} color={theme.primary} />
+        <Text style={styles.stepTitle}>Stay updated</Text>
         <Text style={styles.stepDescription}>
-          Turn on notifications so you don&apos;t miss matches and messages.
+          Enable notifications to get match alerts and messages
         </Text>
       </View>
 
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={async () => {
+        onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          await requestPermissions();
           animateTransition('tutorial');
         }}
         activeOpacity={0.8}
-        testID="enable-notif-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.primaryButtonText}>Enable notifications</Text>
+          <Text style={styles.primaryButtonText}>Enable Notifications</Text>
         </LinearGradient>
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => animateTransition('tutorial')}
         activeOpacity={0.7}
-        testID="skip-notif-btn"
       >
-        <Text style={styles.secondaryButtonText}>Not now</Text>
+        <Text style={styles.secondaryButtonText}>Skip for now</Text>
       </TouchableOpacity>
     </View>
   );
 
+  // -----------------------------
+  // TUTORIAL
+  // -----------------------------
   const renderTutorial = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <View style={[styles.stepIconCircle, { backgroundColor: '#A855F720' }]}>
-          <Sparkles size={28} color={theme.primary} />
-        </View>
+        <Sparkles size={28} color={theme.primary} />
         <Text style={styles.stepTitle}>How Swipeology works</Text>
-      </View>
-
-      <View style={styles.bulletContainer}>
-        <View style={styles.tutorialBullet}>
-          <View style={[styles.tutorialDot, { backgroundColor: theme.secondary }]} />
-          <View style={styles.tutorialTextWrap}>
-            <Text style={styles.tutorialLabel}>Friends</Text>
-            <Text style={styles.tutorialDesc}>
-              Swipe to meet people at ESU who want to make friends.
-            </Text>
-          </View>
-        </View>
-        <View style={styles.tutorialBullet}>
-          <View style={[styles.tutorialDot, { backgroundColor: theme.primary }]} />
-          <View style={styles.tutorialTextWrap}>
-            <Text style={styles.tutorialLabel}>Dating</Text>
-            <Text style={styles.tutorialDesc}>
-              Swipe on people at ESU who match your preferences.
-            </Text>
-          </View>
-        </View>
-        <View style={styles.tutorialBullet}>
-          <View style={[styles.tutorialDot, { backgroundColor: theme.accent }]} />
-          <View style={styles.tutorialTextWrap}>
-            <Text style={styles.tutorialLabel}>Separate</Text>
-            <Text style={styles.tutorialDesc}>
-              Matches and chats are separate for Friends and Dating.
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.stepDescription}>
+          Swipe right to like, left to pass. If you both like each other, it’s a match!
+        </Text>
       </View>
 
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={async () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          if (currentUser) {
-            await completeRegistration(currentUser);
-          }
-          goToStep('complete');
-          router.replace('/(tabs)/swipe');
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          animateTransition('final-submit');
         }}
         activeOpacity={0.8}
-        testID="got-it-btn"
       >
         <LinearGradient
           colors={['#A855F7', '#EC4899']}
           style={styles.buttonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.primaryButtonText}>Got it</Text>
-          <Sparkles size={18} color="#fff" />
+          <Text style={styles.primaryButtonText}>Finish</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>
   );
+  // -----------------------------
+  // FINAL SUBMIT — SAVE PROFILE TO SUPABASE
+  // -----------------------------
+  const renderFinalSubmit = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <Shield size={28} color={theme.primary} />
+        <Text style={styles.stepTitle}>All set!</Text>
+        <Text style={styles.stepDescription}>
+          Tap finish to complete your profile and start swiping
+        </Text>
+      </View>
 
-  const canGoBack = onboardingStep !== 'welcome';
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={async () => {
+          if (!user) {
+            setError('You must be logged in to finish onboarding.');
+            return;
+          }
+
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+          try {
+            const { error: upsertErr } = await supabase
+              .from('users')
+              .upsert({
+                auth_id: user.id,
+                email: user.email,
+
+                // BASIC INFO
+                first_name: firstName.trim(),
+                age: parseInt(age, 10),
+                gender,
+                dating_preference: datingPreference,
+
+                // INTENT
+                wants_friends: wantsFriends,
+                wants_dating: wantsDating,
+
+                // PHOTOS
+                photo1_url: photos[0] || null,
+                photo2_url: photos[1] || null,
+                photo3_url: photos[2] || null,
+                photo4_url: photos[3] || null,
+                photo5_url: photos[4] || null,
+                photo6_url: photos[5] || null,
+
+                // BIO DETAILS
+                bio: bio.trim(),
+                major: major.trim(),
+                class_year: classYear.trim(),
+                interests: interests.trim(),
+
+                // STATUS
+                onboarding_complete: true,
+                updated_at: new Date().toISOString(),
+              });
+
+            if (upsertErr) {
+              setError(upsertErr.message);
+              return;
+            }
+
+            router.replace('/(tabs)/swipe');
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : 'Something went wrong.';
+            setError(msg);
+          }
+        }}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={['#A855F7', '#EC4899']}
+          style={styles.buttonGradient}
+        >
+          <Text style={styles.primaryButtonText}>Finish</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
   const renderStep = () => {
     switch (onboardingStep) {
-      case 'welcome': return renderWelcome();
       case 'login': return renderLogin();
+      case 'forgot-password': return renderForgotPassword();
       case 'phone-login': return renderPhoneLogin();
       case 'esu-email': return renderEsuEmail();
       case 'create-password': return renderCreatePassword();
@@ -1375,474 +1132,16 @@ export default function OnboardingScreen() {
       case 'bio-details': return renderBioDetails();
       case 'notifications': return renderNotifications();
       case 'tutorial': return renderTutorial();
-      case 'forgot-password': return renderForgotPassword();
-      case 'forgot-verify-phone': return renderForgotVerifyPhone();
-      case 'forgot-new-password': return renderForgotNewPassword();
-      default: return renderWelcome();
+      case 'final-submit': return renderFinalSubmit();
+      default: return renderLogin();
     }
   };
-
-  const stepMap: Record<string, OnboardingStep> = {
-    'login': 'welcome',
-    'esu-email': 'phone-login',
-    'create-password': 'esu-email',
-    'name-age': 'create-password',
-    'gender': 'name-age',
-    'dating-preference': 'gender',
-    'intent': 'dating-preference',
-    'photos': 'intent',
-    'bio-details': 'photos',
-    'notifications': 'bio-details',
-    'tutorial': 'notifications',
-    'phone-login': 'welcome',
-    'forgot-password': 'login',
-    'forgot-verify-phone': 'forgot-password',
-    'forgot-new-password': 'forgot-verify-phone',
-  };
-
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {canGoBack && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              const prev = stepMap[onboardingStep];
-              if (prev) animateTransition(prev);
-            }}
-            activeOpacity={0.7}
-            testID="back-btn"
-          >
-            <ArrowLeft size={24} color={theme.text} />
-          </TouchableOpacity>
-        )}
-
-        {onboardingStep !== 'welcome' && onboardingStep !== 'login' && (
-          <View style={styles.progressContainer}>
-            {['phone-login', 'esu-email', 'create-password', 'name-age', 'gender', 'dating-preference', 'intent', 'photos', 'bio-details', 'notifications', 'tutorial'].map((step, i) => (
-              <View
-                key={step}
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor:
-                      ['phone-login', 'esu-email', 'create-password', 'name-age', 'gender', 'dating-preference', 'intent', 'photos', 'bio-details', 'notifications', 'tutorial'].indexOf(onboardingStep) >= i
-                        ? theme.primary
-                        : theme.border,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-        )}
-
-        <Animated.View style={[styles.flex, { opacity: fadeAnim }]}>
-          {renderStep()}
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </View>
+    <Animated.View style={{ flex: 1, opacity: fadeAnim, paddingTop: insets.top }}>
+      {renderStep()}
+    </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  backButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    alignSelf: 'flex-start',
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-  },
-  progressDot: {
-    flex: 1,
-    height: 3,
-    borderRadius: 2,
-  },
-  stepContainer: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  scrollStep: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  welcomeHeader: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  welcomeTitle: {
-    fontSize: 36,
-    fontWeight: '800' as const,
-    color: theme.text,
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: theme.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
-  },
-  bulletContainer: {
-    gap: 16,
-    marginBottom: 40,
-  },
-  bulletRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  bulletIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bulletText: {
-    flex: 1,
-    fontSize: 15,
-    color: theme.textSecondary,
-    lineHeight: 22,
-  },
-  bottomActions: {
-    gap: 16,
-    alignItems: 'center',
-  },
-  primaryButton: {
-    width: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 8,
-  },
-  primaryButtonText: {
-    fontSize: 17,
-    fontWeight: '700' as const,
-    color: '#fff',
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    color: theme.textSecondary,
-    fontWeight: '600' as const,
-    paddingVertical: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  stepHeader: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  stepIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  stepTitle: {
-    fontSize: 28,
-    fontWeight: '800' as const,
-    color: theme.text,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  stepDescription: {
-    fontSize: 15,
-    color: theme.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: theme.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  },
-  textInput: {
-    backgroundColor: theme.inputBg,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: theme.text,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.inputBg,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: theme.text,
-  },
-  eyeButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 16,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-    paddingTop: 16,
-  },
-  errorText: {
-    color: theme.error,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  infoCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: 20,
-    gap: 10,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  infoText: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    lineHeight: 22,
-  },
-  optionsContainer: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-  },
-  optionButtonSelected: {
-    borderColor: theme.primary,
-    backgroundColor: '#A855F710',
-  },
-  optionText: {
-    fontSize: 16,
-    color: theme.textSecondary,
-    fontWeight: '500' as const,
-  },
-  optionTextSelected: {
-    color: theme.text,
-    fontWeight: '600' as const,
-  },
-  toggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    gap: 14,
-  },
-  toggleButtonActive: {
-    borderColor: theme.primary,
-    backgroundColor: theme.primary,
-  },
-  toggleText: {
-    flex: 1,
-    fontSize: 16,
-    color: theme.textSecondary,
-    fontWeight: '500' as const,
-  },
-  toggleTextActive: {
-    color: '#fff',
-    fontWeight: '600' as const,
-  },
-  toggleCheck: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  toggleCheckActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
-  },
-  photoBox: {
-    width: (SCREEN_WIDTH - 48 - 24) / 3,
-    height: (SCREEN_WIDTH - 48 - 24) / 3 * 1.3,
-    borderRadius: 14,
-    backgroundColor: theme.surface,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoBoxFilled: {
-    borderStyle: 'solid',
-    borderColor: theme.primary,
-    backgroundColor: '#A855F715',
-  },
-  photoPlaceholder: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  photoPlaceholderText: {
-    fontSize: 12,
-    color: theme.textMuted,
-  },
-  photoPreview: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  photoPreviewText: {
-    fontSize: 12,
-    color: theme.primary,
-    fontWeight: '600' as const,
-  },
-  photoRemove: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipPhotoButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  skipPhotoText: {
-    fontSize: 14,
-    color: theme.textMuted,
-    textDecorationLine: 'underline',
-  },
-  tutorialBullet: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  tutorialDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 6,
-  },
-  tutorialTextWrap: {
-    flex: 1,
-  },
-  tutorialLabel: {
-    fontSize: 17,
-    fontWeight: '700' as const,
-    color: theme.text,
-    marginBottom: 4,
-  },
-  tutorialDesc: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    lineHeight: 21,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: theme.primary,
-    fontWeight: '600' as const,
-    paddingVertical: 8,
-  },
-  forgotPhoneDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: theme.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
-    marginBottom: 24,
-    width: '100%',
-  },
-  forgotPhoneText: {
-    fontSize: 16,
-    color: theme.text,
-    fontWeight: '500' as const,
-  },
-  forgotCodeInput: {
-    backgroundColor: theme.inputBg,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    fontSize: 28,
-    color: theme.text,
-    borderWidth: 1,
-    borderColor: theme.border,
-    textAlign: 'center' as const,
-    letterSpacing: 12,
-    fontWeight: '700' as const,
-  },
-});
+
+  
