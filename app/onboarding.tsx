@@ -373,7 +373,7 @@ export default function OnboardingScreen() {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <<TouchableOpacity
+      <TouchableOpacity
   style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
   onPress={async () => {
     if (!loginEmail.trim()) {
