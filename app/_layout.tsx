@@ -4,7 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import Colors from "@/constants/colors";
@@ -14,13 +14,6 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { user, profile, loading } = useAuth();
-
-  // Wait until AuthContext finishes loading
-  if (loading) return null;
-
-  const hasProfile = !!profile;
-
   return (
     <Stack
       screenOptions={{
@@ -29,11 +22,9 @@ function RootLayoutNav() {
         headerShown: false,
       }}
     >
-      {!user && <Stack.Screen name="index" />}
-
-      {user && !hasProfile && <Stack.Screen name="onboarding" />}
-
-      {user && hasProfile && <Stack.Screen name="(tabs)" />}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(tabs)" />
     </Stack>
   );
 }
