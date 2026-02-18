@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, Slot } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -6,7 +6,6 @@ import { DataProvider } from "@/contexts/DataContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,12 +22,8 @@ export default function RootLayout() {
         <AuthProvider>
           <NotificationProvider>
             <DataProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: Colors.dark.background },
-                }}
-              >
+              {/* ⭐ ALWAYS RENDER A NAVIGATOR ON FIRST RENDER */}
+              <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
                 <Stack.Screen name="onboarding" />
                 <Stack.Screen name="(tabs)" />
