@@ -20,10 +20,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
 
   const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
-    console.log('[Auth] Checking profiles table for user:', userId);
+    console.log('[Auth] Checking users table for user:', userId);
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .eq('id', userId)
         .single();

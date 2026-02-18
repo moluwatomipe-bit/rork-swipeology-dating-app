@@ -1147,7 +1147,7 @@ export default function OnboardingScreen() {
             };
 
             const { error: upsertError } = await supabase
-              .from('profiles')
+              .from('users')
               .upsert(profileData, { onConflict: 'id' });
 
             if (upsertError) {
