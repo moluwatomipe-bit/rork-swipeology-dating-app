@@ -213,7 +213,7 @@ export default function ChatScreen() {
             ref={flatListRef}
             data={chatMessages}
             renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => `${item.id}-${item.created_at}`}
             contentContainerStyle={styles.messagesList}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
