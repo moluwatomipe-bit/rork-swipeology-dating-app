@@ -355,19 +355,17 @@ const getFilteredUsers = useCallback(
   [currentUser, swipes]
 );
 
-return {
-  swipes,
-  matches,
-  messages,
-  performSwipe,
-  sendMessage,
-  getMatchesForContext,
-  getMessagesForMatch,
-  getOtherUserForMatch,
-  removeMatch,
-  loadMessagesForMatch,
-  getFilteredUsers,   // ← ADDED BACK
-};
-  
+  return {
+    swipes,
+    matches,
+    messages,
+    performSwipe,
+    sendMessage,
+    getMatchesForContext,
+    getMessagesForMatch,
+    getOtherUserForMatch,
+    removeMatch,
+    loadMessagesForMatch,
+    getFilteredUsers,
   };
 });
