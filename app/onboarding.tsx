@@ -36,6 +36,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/supabase';
+import { fetchPronouns, PronounOption } from '@/lib/pronouns';
 import Colors from '@/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -43,6 +44,7 @@ const theme = Colors.dark;
 
 type GenderOption = 'man' | 'woman' | 'non-binary' | 'prefer not to say';
 type DatingPrefOption = 'men' | 'women' | 'both';
+type OnboardingStepType = 'welcome' | 'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'pronouns' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit';
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -51,7 +53,7 @@ export default function OnboardingScreen() {
   const { login, signUp, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser, session, refreshProfile, isLoggingIn, isSigningUp } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('welcome');
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStepType>('welcome');
 
   const animateTransition = (next: typeof onboardingStep) => {
     Animated.timing(fadeAnim, {
@@ -91,6 +93,9 @@ export default function OnboardingScreen() {
   const [interests, setInterests] = useState('');
 
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedPronouns, setSelectedPronouns] = useState<string>('');
+  const [pronounOptions, setPronounOptions] = useState<PronounOption[]>([]);
+  const [pronounsLoaded, setPronounsLoaded] = useState(false);
   const [error, setError] = useState('');
 
   const handlePickPhoto = async (index: number) => {
@@ -729,7 +734,13 @@ export default function OnboardingScreen() {
             }
 
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            animateTransition('dating-preference');
+            if (!pronounsLoaded) {
+              fetchPronouns().then((opts) => {
+                setPronounOptions(opts);
+                setPronounsLoaded(true);
+              });
+            }
+            animateTransition('pronouns');
           }}
           activeOpacity={0.8}
           disabled={!gender}
@@ -740,6 +751,82 @@ export default function OnboardingScreen() {
           >
             <Text style={styles.primaryButtonText}>Continue</Text>
           </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderPronouns = () => {
+    return (
+      <View style={styles.stepContainer}>
+        <View style={styles.stepHeader}>
+          <Text style={styles.stepTitle}>Your pronouns</Text>
+          <Text style={styles.stepDescription}>This helps others know how to refer to you.</Text>
+        </View>
+
+        <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+          <View style={styles.optionsContainer}>
+            {pronounOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[
+                  styles.optionButton,
+                  selectedPronouns === opt.value && styles.optionButtonSelected,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedPronouns(opt.value);
+                  setError('');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    selectedPronouns === opt.value && styles.optionTextSelected,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+                {selectedPronouns === opt.value && <Check size={18} color={theme.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <TouchableOpacity
+          style={[styles.primaryButton, !selectedPronouns && styles.buttonDisabled]}
+          onPress={() => {
+            if (!selectedPronouns) {
+              setError('Please select your pronouns');
+              return;
+            }
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            animateTransition('dating-preference');
+          }}
+          activeOpacity={0.8}
+          disabled={!selectedPronouns}
+        >
+          <LinearGradient
+            colors={selectedPronouns ? ['#A855F7', '#EC4899'] : ['#444', '#555']}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.primaryButtonText}>Continue</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedPronouns('prefer not to say');
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            animateTransition('dating-preference');
+          }}
+          activeOpacity={0.7}
+          style={{ marginTop: 14, alignSelf: 'center' }}
+        >
+          <Text style={{ color: theme.textMuted, fontSize: 15 }}>Skip</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1129,7 +1216,7 @@ export default function OnboardingScreen() {
               first_name: firstName.trim(),
               age: parseInt(age, 10) || 18,
               gender: gender || 'prefer not to say',
-              pronouns: '',
+              pronouns: selectedPronouns,
               dating_preference: datingPreference || 'both',
               wants_friends: wantsFriends,
               wants_dating: wantsDating,
@@ -1164,6 +1251,7 @@ export default function OnboardingScreen() {
             const localUser = {
               ...profileData,
               password: '',
+              blocked_users: [] as string[],
             };
             await completeRegistration(localUser);
             goToStep('complete');
@@ -1198,6 +1286,7 @@ export default function OnboardingScreen() {
       case 'create-password': return renderCreatePassword();
       case 'name-age': return renderNameAge();
       case 'gender': return renderGender();
+      case 'pronouns': return renderPronouns();
       case 'dating-preference': return renderDatingPreference();
       case 'intent': return renderIntent();
       case 'photos': return renderPhotos();

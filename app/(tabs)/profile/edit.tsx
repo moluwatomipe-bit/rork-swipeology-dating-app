@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useAuth } from '@/contexts/AuthContext';
 import { User } from '@/types';
+import { fetchPronouns, PronounOption } from '@/lib/pronouns';
 import Colors from '@/constants/colors';
 
 const theme = Colors.dark;
@@ -28,6 +29,12 @@ export default function EditProfileScreen() {
   const [major, setMajor] = useState<string>(currentUser?.major || '');
   const [classYear, setClassYear] = useState<string>(currentUser?.class_year || '');
   const [pronouns, setPronouns] = useState<string>(currentUser?.pronouns || '');
+  const [pronounOptions, setPronounOptions] = useState<PronounOption[]>([]);
+  const [showPronounPicker, setShowPronounPicker] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetchPronouns().then(setPronounOptions);
+  }, []);
   const [interests, setInterests] = useState<string>(currentUser?.interests || '');
   const [photos, setPhotos] = useState<string[]>([
     currentUser?.photo1_url || '',
@@ -159,14 +166,41 @@ export default function EditProfileScreen() {
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Pronouns</Text>
-          <TextInput
+          <TouchableOpacity
             style={styles.textInput}
-            value={pronouns}
-            onChangeText={setPronouns}
-            placeholder="e.g., she/her, he/him, they/them"
-            placeholderTextColor={theme.textMuted}
+            onPress={() => setShowPronounPicker(!showPronounPicker)}
+            activeOpacity={0.7}
             testID="edit-pronouns-input"
-          />
+          >
+            <Text style={{ color: pronouns ? theme.text : theme.textMuted, fontSize: 16 }}>
+              {pronouns ? pronounOptions.find(p => p.value === pronouns)?.label || pronouns : 'Select pronouns'}
+            </Text>
+          </TouchableOpacity>
+          {showPronounPicker && (
+            <View style={styles.pronounPickerContainer}>
+              {pronounOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.pronounOption,
+                    pronouns === opt.value && styles.pronounOptionSelected,
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setPronouns(opt.value);
+                    setShowPronounPicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.pronounOptionText,
+                    pronouns === opt.value && styles.pronounOptionTextSelected,
+                  ]}>{opt.label}</Text>
+                  {pronouns === opt.value && <Check size={16} color={theme.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.inputGroup}>
@@ -352,5 +386,33 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700' as const,
     color: '#fff',
+  },
+  pronounPickerContainer: {
+    marginTop: 8,
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: 'hidden',
+  },
+  pronounOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  pronounOptionSelected: {
+    backgroundColor: `${theme.primary}15`,
+  },
+  pronounOptionText: {
+    fontSize: 16,
+    color: theme.text,
+  },
+  pronounOptionTextSelected: {
+    color: theme.primary,
+    fontWeight: '600' as const,
   },
 });
