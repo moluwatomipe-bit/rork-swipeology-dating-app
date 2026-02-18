@@ -1143,7 +1143,7 @@ export default function OnboardingScreen() {
               major: major.trim(),
               class_year: classYear.trim(),
               interests: interests.trim(),
-              blocked_users: [],
+
             };
 
             const { error: upsertError } = await supabase
