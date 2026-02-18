@@ -23,6 +23,11 @@ export const [DataProvider, useData] = createContextHook(() => {
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
 
+  // TEMPORARY CLEANUP — run once to remove old message format
+  useEffect(() => {
+    AsyncStorage.removeItem('@swipeology_messages');
+  }, []);
+
   /* -------------------------------------------------------
      INTERNAL STATE (Maps)
   ------------------------------------------------------- */
