@@ -4,11 +4,24 @@ import { Session, User } from "@supabase/supabase-js";
 
 type Profile = {
   id: string;
-  first_name?: string;
-  age?: number;
-  gender?: string;
-  bio?: string;
-  photos?: string[];
+  first_name: string | null;
+  age: number | null;
+  gender: string | null;
+  bio: string | null;
+  major: string | null;
+  class_year: string | null;
+  interests: string | null;
+  pronouns: string | null;
+  dating_preference: string | null;
+  wants_friends: boolean | null;
+  wants_dating: boolean | null;
+  phone_number: string | null;
+  school_email: string | null;
+  university: string | null;
+  is_verified_esu: boolean | null;
+  phone_verified: boolean | null;
+  blocked_users: string[];
+  photos: string[];
 };
 
 type AuthContextType = {
@@ -30,7 +43,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user + profile on app startup
   useEffect(() => {
     const loadSession = async () => {
       const {
@@ -47,7 +59,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     loadSession();
 
-    // Listen for login/logout changes
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (session?.user) {
@@ -67,16 +78,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loadProfile = async (userId: string) => {
     const { data, error } = await supabase
-      .from("profiles")
+      .from("users")
       .select("*")
       .eq("id", userId)
       .single();
 
-    if (!error && data) {
-      setProfile(data);
-    } else {
+    if (error || !data) {
       setProfile(null);
+      return;
     }
+
+    // SAFELY convert null → arrays to prevent crashes
+    setProfile({
+      ...data,
+      blocked_users: data.blocked_users ?? [],
+      photos: data.photos ?? [],
+    });
   };
 
   const refreshProfile = async () => {
