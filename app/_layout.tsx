@@ -16,7 +16,7 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   const { user, profile, loading } = useAuth();
 
-  // While auth/profile is loading, don't render navigation yet
+  // Wait until AuthContext finishes loading
   if (loading) return null;
 
   const hasProfile = !!profile;
