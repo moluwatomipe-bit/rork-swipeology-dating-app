@@ -22,7 +22,7 @@ export async function fetchPronouns(): Promise<PronounOption[]> {
     const { data, error } = await supabase
       .from('pronouns')
       .select('id, label, value')
-      .order('created_at', { ascending: true });
+      .order('label', { ascending: true }); // FIXED
 
     if (error) {
       console.log('[Pronouns] Fetch error:', error.message);
@@ -41,3 +41,4 @@ export async function fetchPronouns(): Promise<PronounOption[]> {
     return FALLBACK_PRONOUNS;
   }
 }
+
