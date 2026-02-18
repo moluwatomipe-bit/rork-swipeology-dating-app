@@ -1,22 +1,27 @@
 import { useEffect } from "react";
-import { router } from "expo-router";
+import { useRouter, useRootNavigationState } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import Colors from "@/constants/colors";
 
 export default function Index() {
+  const router = useRouter();
+  const navState = useRootNavigationState();
   const { user, profile, loading } = useAuth();
 
-  useEffect(() => {
-    if (loading) return;
+  // Wait until navigation is fully mounted
+  const navReady = navState?.key != null;
 
-    // No user → go to login screen
+  useEffect(() => {
+    if (!navReady || loading) return;
+
+    // No user → onboarding
     if (!user) {
       router.replace("/onboarding");
       return;
     }
 
-    // User exists but no profile → onboarding
+    // User but no profile → onboarding
     if (user && !profile) {
       router.replace("/onboarding");
       return;
@@ -26,7 +31,7 @@ export default function Index() {
     if (user && profile) {
       router.replace("/(tabs)/swipe");
     }
-  }, [user, profile, loading]);
+  }, [navReady, loading, user, profile]);
 
   return (
     <View style={styles.container}>
@@ -43,4 +48,3 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
   },
 });
-
