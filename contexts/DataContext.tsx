@@ -299,17 +299,70 @@ export const [DataProvider, useData] = createContextHook(() => {
     },
     [persistMessages]
   );
+const getFilteredUsers = useCallback(
+  (context: 'friends' | 'dating'): User[] => {
+    if (!currentUser) return [];
 
-  return {
-    swipes,
-    matches,
-    messages,
-    performSwipe,
-    sendMessage,
-    getMatchesForContext,
-    getMessagesForMatch,
-    getOtherUserForMatch,
-    removeMatch,
-    loadMessagesForMatch,
+    const blockedIds = currentUser.blocked_users || [];
+
+    // Users the current user already swiped on
+    const swipedUserIds = swipes
+      .filter((s) => s.user_from === currentUser.id && s.context === context)
+      .map((s) => s.user_to);
+
+    return MOCK_USERS.filter((u) => {
+      if (u.id === currentUser.id) return false;
+      if (swipedUserIds.includes(u.id)) return false;
+      if (blockedIds.includes(u.id)) return false;
+      if ((u.blocked_users || []).includes(currentUser.id)) return false;
+
+      // Must be same school + verified
+      if (u.university !== currentUser.university) return false;
+      if (!u.is_verified_esu) return false;
+
+      // FRIENDS MODE
+      if (context === 'friends') {
+        return u.wants_friends && currentUser.wants_friends;
+      }
+
+      // DATING MODE
+      if (context === 'dating') {
+        if (!u.wants_dating || !currentUser.wants_dating) return false;
+
+        // CURRENT USER'S preference
+        if (currentUser.dating_preference === 'men' && u.gender !== 'man')
+          return false;
+        if (currentUser.dating_preference === 'women' && u.gender !== 'woman')
+          return false;
+
+        // OTHER USER'S preference
+        if (u.dating_preference === 'men' && currentUser.gender !== 'man')
+          return false;
+        if (u.dating_preference === 'women' && currentUser.gender !== 'woman')
+          return false;
+
+        return true;
+      }
+
+      return true;
+    });
+  },
+  [currentUser, swipes]
+);
+
+return {
+  swipes,
+  matches,
+  messages,
+  performSwipe,
+  sendMessage,
+  getMatchesForContext,
+  getMessagesForMatch,
+  getOtherUserForMatch,
+  removeMatch,
+  loadMessagesForMatch,
+  getFilteredUsers,   // ← ADDED BACK
+};
+  
   };
 });
