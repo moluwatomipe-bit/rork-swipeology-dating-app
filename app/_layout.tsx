@@ -14,9 +14,12 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { session, hasProfile, profileChecked, isReady, isLoading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
-  if (!isReady || isLoading || !profileChecked) return null;
+  // While auth/profile is loading, don't render navigation yet
+  if (loading) return null;
+
+  const hasProfile = !!profile;
 
   return (
     <Stack
@@ -26,11 +29,11 @@ function RootLayoutNav() {
         headerShown: false,
       }}
     >
-      {!session && <Stack.Screen name="index" />}
+      {!user && <Stack.Screen name="index" />}
 
-      {session && !hasProfile && <Stack.Screen name="onboarding" />}
+      {user && !hasProfile && <Stack.Screen name="onboarding" />}
 
-      {session && hasProfile && <Stack.Screen name="(tabs)" />}
+      {user && hasProfile && <Stack.Screen name="(tabs)" />}
     </Stack>
   );
 }
