@@ -261,6 +261,27 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     console.log('[Auth] Registration complete, hasProfile set to true');
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      console.log('[Auth] refreshProfile: no session user');
+      return;
+    }
+    console.log('[Auth] refreshProfile for:', userId);
+    const profile = await fetchProfile(userId);
+    if (profile) {
+      setCurrentUser(profile);
+      setHasProfile(true);
+      setOnboardingStep('complete');
+      setProfileChecked(true);
+      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
+      await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'complete');
+      console.log('[Auth] refreshProfile: profile loaded successfully');
+    } else {
+      console.log('[Auth] refreshProfile: no profile found');
+    }
+  }, [session?.user?.id, fetchProfile]);
+
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ email }: { email: string }) => {
       console.log('[Auth] Sending password reset to:', email);
@@ -445,5 +466,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     isLoading: loadStoredData.isLoading,
     hasProfile,
     profileChecked,
+    refreshProfile,
   };
 });

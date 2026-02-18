@@ -14,10 +14,9 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { user, profile, loading } = useAuth();
+  const { session, hasProfile, profileChecked, isReady, isLoading } = useAuth();
 
-  // Don’t render anything until AuthContext finishes loading
-  if (loading) return null;
+  if (!isReady || isLoading || !profileChecked) return null;
 
   return (
     <Stack
@@ -27,14 +26,11 @@ function RootLayoutNav() {
         headerShown: false,
       }}
     >
-      {/* No user → show login */}
-      {!user && <Stack.Screen name="index" />}
+      {!session && <Stack.Screen name="index" />}
 
-      {/* User exists but no profile → onboarding */}
-      {user && !profile && <Stack.Screen name="onboarding" />}
+      {session && !hasProfile && <Stack.Screen name="onboarding" />}
 
-      {/* User + profile → main app */}
-      {user && profile && <Stack.Screen name="(tabs)" />}
+      {session && hasProfile && <Stack.Screen name="(tabs)" />}
     </Stack>
   );
 }

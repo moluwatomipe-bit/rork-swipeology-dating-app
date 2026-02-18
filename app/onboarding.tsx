@@ -35,6 +35,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/supabase';
 import Colors from '@/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -47,7 +48,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const { login, signUp, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser, isLoggingIn, isSigningUp } = useAuth();
+  const { login, signUp, completeRegistration, updateUser, goToStep, resetPassword, lookupAccountByEmail, currentUser, session, refreshProfile, isLoggingIn, isSigningUp } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'login' | 'forgot-password' | 'phone-login' | 'esu-email' | 'create-password' | 'name-age' | 'gender' | 'dating-preference' | 'intent' | 'photos' | 'bio-details' | 'notifications' | 'tutorial' | 'final-submit'>('welcome');
@@ -1101,24 +1102,35 @@ export default function OnboardingScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+        disabled={isSubmitting}
         onPress={async () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setIsSubmitting(true);
+          setError('');
 
           try {
-            const newUser = {
-              id: `user_${Date.now()}`,
-              phone_number: '',
+            const userId = session?.user?.id;
+            if (!userId) {
+              setError('You must be logged in to complete your profile.');
+              setIsSubmitting(false);
+              return;
+            }
+
+            console.log('[Onboarding] Upserting profile with id:', userId);
+
+            const profileData = {
+              id: userId,
+              phone_number: phoneNumber.trim() || '',
               phone_verified: false,
-              school_email: schoolEmail.trim(),
-              password: password.trim(),
+              school_email: schoolEmail.trim() || session?.user?.email || '',
               university: 'East Stroudsburg University',
               is_verified_esu: true,
               first_name: firstName.trim(),
               age: parseInt(age, 10) || 18,
-              gender: gender || 'prefer not to say' as const,
+              gender: gender || 'prefer not to say',
               pronouns: '',
-              dating_preference: datingPreference || 'both' as const,
+              dating_preference: datingPreference || 'both',
               wants_friends: wantsFriends,
               wants_dating: wantsDating,
               photo1_url: photos[0] || '',
@@ -1134,13 +1146,34 @@ export default function OnboardingScreen() {
               blocked_users: [],
             };
 
-            updateUser(newUser);
-            await completeRegistration(newUser);
+            const { error: upsertError } = await supabase
+              .from('profiles')
+              .upsert(profileData, { onConflict: 'id' });
+
+            if (upsertError) {
+              console.log('[Onboarding] Upsert error:', upsertError.message);
+              setError(upsertError.message);
+              setIsSubmitting(false);
+              return;
+            }
+
+            console.log('[Onboarding] Profile saved to Supabase successfully');
+
+            await refreshProfile();
+
+            const localUser = {
+              ...profileData,
+              password: '',
+            };
+            await completeRegistration(localUser);
             goToStep('complete');
             router.replace('/(tabs)/swipe' as any);
           } catch (e) {
             const msg = e instanceof Error ? e.message : 'Something went wrong.';
+            console.log('[Onboarding] Final submit error:', msg);
             setError(msg);
+          } finally {
+            setIsSubmitting(false);
           }
         }}
         activeOpacity={0.8}
