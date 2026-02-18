@@ -1,19 +1,38 @@
 import { supabase } from '@/supabase';
 import { Match, Message } from '@/types';
 
+/* -------------------------------------------------------
+   CREATE MATCH (duplicate-proof)
+------------------------------------------------------- */
 export async function createMatch(
   user1: string,
   user2: string,
   context: 'friends' | 'dating'
 ): Promise<Match | null> {
   console.log('[Supabase] Creating match:', user1, user2, context);
+
+  // 1. Check if match already exists (in either direction)
+  const { data: existing, error: existingError } = await supabase
+    .from('matches')
+    .select('*')
+    .or(
+      `and(user1.eq.${user1},user2.eq.${user2}),and(user1.eq.${user2},user2.eq.${user1})`
+    )
+    .eq('context', context)
+    .maybeSingle();
+
+  if (existing) {
+    console.log('[Supabase] Match already exists:', existing.id);
+    return existing as Match;
+  }
+
+  // 2. Create a new match
   const { data, error } = await supabase
     .from('matches')
     .insert({
       user1,
       user2,
       context,
-      created_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -22,12 +41,17 @@ export async function createMatch(
     console.log('[Supabase] Create match error:', error.message);
     return null;
   }
+
   console.log('[Supabase] Match created:', data.id);
   return data as Match;
 }
 
+/* -------------------------------------------------------
+   FETCH MATCHES FOR USER
+------------------------------------------------------- */
 export async function fetchMatchesForUser(userId: string): Promise<Match[]> {
   console.log('[Supabase] Fetching matches for user:', userId);
+
   const { data, error } = await supabase
     .from('matches')
     .select('*')
@@ -38,12 +62,17 @@ export async function fetchMatchesForUser(userId: string): Promise<Match[]> {
     console.log('[Supabase] Fetch matches error:', error.message);
     return [];
   }
+
   console.log('[Supabase] Fetched matches:', data?.length ?? 0);
   return (data ?? []) as Match[];
 }
 
+/* -------------------------------------------------------
+   FETCH MESSAGES FOR MATCH
+------------------------------------------------------- */
 export async function fetchMessagesForMatch(matchId: string): Promise<Message[]> {
   console.log('[Supabase] Fetching messages for match:', matchId);
+
   const { data, error } = await supabase
     .from('messages')
     .select('*')
@@ -54,23 +83,27 @@ export async function fetchMessagesForMatch(matchId: string): Promise<Message[]>
     console.log('[Supabase] Fetch messages error:', error.message);
     return [];
   }
+
   console.log('[Supabase] Fetched messages:', data?.length ?? 0);
   return (data ?? []) as Message[];
 }
 
+/* -------------------------------------------------------
+   SEND MESSAGE (clean, no temp IDs)
+------------------------------------------------------- */
 export async function sendMessageToMatch(
   matchId: string,
   senderId: string,
   messageText: string
 ): Promise<Message | null> {
   console.log('[Supabase] Sending message to match:', matchId);
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
       match_id: matchId,
       sender_id: senderId,
       message_text: messageText,
-      created_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -79,10 +112,14 @@ export async function sendMessageToMatch(
     console.log('[Supabase] Send message error:', error.message);
     return null;
   }
+
   console.log('[Supabase] Message sent:', data.id);
   return data as Message;
 }
 
+/* -------------------------------------------------------
+   CREATE SWIPE RECORD
+------------------------------------------------------- */
 export async function createSwipeRecord(
   userFrom: string,
   userTo: string,
@@ -90,6 +127,7 @@ export async function createSwipeRecord(
   liked: boolean
 ) {
   console.log('[Supabase] Creating swipe:', userFrom, '->', userTo, liked ? 'LIKE' : 'PASS');
+
   const { error } = await supabase
     .from('swipes')
     .insert({
@@ -97,7 +135,6 @@ export async function createSwipeRecord(
       user_to: userTo,
       context,
       liked,
-      created_at: new Date().toISOString(),
     });
 
   if (error) {
@@ -105,12 +142,16 @@ export async function createSwipeRecord(
   }
 }
 
+/* -------------------------------------------------------
+   CHECK MUTUAL SWIPE
+------------------------------------------------------- */
 export async function checkMutualSwipe(
   userFrom: string,
   userTo: string,
   context: 'friends' | 'dating'
 ): Promise<boolean> {
   console.log('[Supabase] Checking mutual swipe:', userTo, '->', userFrom);
+
   const { data, error } = await supabase
     .from('swipes')
     .select('id')
@@ -124,11 +165,16 @@ export async function checkMutualSwipe(
     console.log('[Supabase] Check mutual swipe error:', error.message);
     return false;
   }
+
   return (data?.length ?? 0) > 0;
 }
 
+/* -------------------------------------------------------
+   DELETE MATCH
+------------------------------------------------------- */
 export async function deleteMatchRecord(matchId: string): Promise<boolean> {
   console.log('[Supabase] Deleting match:', matchId);
+
   const { error } = await supabase
     .from('matches')
     .delete()
@@ -138,14 +184,19 @@ export async function deleteMatchRecord(matchId: string): Promise<boolean> {
     console.log('[Supabase] Delete match error:', error.message);
     return false;
   }
+
   return true;
 }
 
+/* -------------------------------------------------------
+   REAL-TIME MESSAGE SUBSCRIPTION
+------------------------------------------------------- */
 export function subscribeToMessages(
   matchId: string,
   onNewMessage: (message: Message) => void
 ) {
   console.log('[Supabase] Subscribing to messages for match:', matchId);
+
   const channel = supabase
     .channel(`messages:${matchId}`)
     .on(
@@ -169,11 +220,15 @@ export function subscribeToMessages(
   };
 }
 
+/* -------------------------------------------------------
+   REAL-TIME MATCH SUBSCRIPTION
+------------------------------------------------------- */
 export function subscribeToMatches(
   userId: string,
   onNewMatch: (match: Match) => void
 ) {
   console.log('[Supabase] Subscribing to matches for user:', userId);
+
   const channel = supabase
     .channel(`matches:${userId}`)
     .on(
@@ -185,6 +240,7 @@ export function subscribeToMatches(
       },
       (payload) => {
         const match = payload.new as Match;
+
         if (match.user1 === userId || match.user2 === userId) {
           console.log('[Supabase] New match received:', match.id);
           onNewMatch(match);
@@ -198,3 +254,4 @@ export function subscribeToMatches(
     supabase.removeChannel(channel);
   };
 }
+
