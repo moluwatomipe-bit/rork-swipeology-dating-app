@@ -1,31 +1,32 @@
-import { useEffect } from 'react';
-import { router } from 'expo-router';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
-import Colors from '@/constants/colors';
+import { useEffect } from "react";
+import { router } from "expo-router";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { useAuth } from "@/contexts/AuthContext";
+import Colors from "@/constants/colors";
 
 export default function Index() {
-  const { currentUser, onboardingStep, isReady, session, hasProfile, profileChecked } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   useEffect(() => {
-    if (!isReady || !profileChecked) return;
+    if (loading) return;
 
-    console.log('[Nav] Routing decision - session:', !!session, 'hasProfile:', hasProfile, 'currentUser:', !!currentUser, 'step:', onboardingStep);
-
-    if (!session) {
-      console.log('[Nav] No session, going to onboarding');
-      router.replace('/onboarding' as any);
+    // No user → go to login screen
+    if (!user) {
+      router.replace("/onboarding");
       return;
     }
 
-    if (hasProfile === true) {
-      console.log('[Nav] Profile exists, going to main app');
-      router.replace('/(tabs)/swipe' as any);
-    } else {
-      console.log('[Nav] Logged in but no profile, going to onboarding');
-      router.replace('/onboarding' as any);
+    // User exists but no profile → onboarding
+    if (user && !profile) {
+      router.replace("/onboarding");
+      return;
     }
-  }, [isReady, profileChecked, session, hasProfile, currentUser, onboardingStep]);
+
+    // User + profile → main app
+    if (user && profile) {
+      router.replace("/(tabs)/swipe");
+    }
+  }, [user, profile, loading]);
 
   return (
     <View style={styles.container}>
@@ -37,8 +38,9 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: Colors.dark.background,
   },
 });
+
