@@ -8,16 +8,19 @@
     "scheme": "rork-app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.swipeology-dating-app",
       "buildNumber": "5"
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -25,9 +28,11 @@
       },
       "package": "app.rork.swipeology_dating_app"
     },
+
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       [
         "expo-router",
@@ -38,8 +43,14 @@
       "expo-font",
       "expo-web-browser"
     ],
+
     "experiments": {
       "typedRoutes": true
+    },
+
+    "extra": {
+      "supabaseUrl": "https://yolnmuisgloideripwqt.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbG5tdWlzZ2xvaWRlcmlwd3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNDI4MzMsImV4cCI6MjA4NjkxODgzM30._cxWUqSea1xQpAEp-xstWO4V-oJeKj_Q6NFz4raV5no"
     }
   }
 }
