@@ -1,43 +1,32 @@
-import { useEffect } from "react";
-import { useRouter, useRootNavigationState } from "expo-router";
+import { Redirect } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import Colors from "@/constants/colors";
 
 export default function Index() {
-  const router = useRouter();
-  const navState = useRootNavigationState();
   const { user, profile, loading } = useAuth();
 
-  // Wait until navigation is fully mounted
-  const navReady = navState?.key != null;
+  // Still loading auth → show spinner, don't navigate yet
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={Colors.dark.primary} />
+      </View>
+    );
+  }
 
-  useEffect(() => {
-    if (!navReady || loading) return;
+  // No user → go to onboarding / auth flow
+  if (!user) {
+    return <Redirect href="/onboarding" />;
+  }
 
-    // No user → onboarding
-    if (!user) {
-      router.replace("/onboarding");
-      return;
-    }
+  // User but no profile → onboarding
+  if (user && !profile) {
+    return <Redirect href="/onboarding" />;
+  }
 
-    // User but no profile → onboarding
-    if (user && !profile) {
-      router.replace("/onboarding");
-      return;
-    }
-
-    // User + profile → main app
-    if (user && profile) {
-      router.replace("/(tabs)/swipe");
-    }
-  }, [navReady, loading, user, profile]);
-
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color={Colors.dark.primary} />
-    </View>
-  );
+  // User + profile → main app
+  return <Redirect href="/(tabs)/swipe" />;
 }
 
 const styles = StyleSheet.create({
