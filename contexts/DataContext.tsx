@@ -4,6 +4,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Swipe, Match, Message, User } from '@/types';
 import { MOCK_USERS } from '@/mocks/users';
+import { supabase } from '@/supabase';
 import { useAuth } from './AuthContext';
 import {
   createMatch as createMatchSupabase,
@@ -34,6 +35,63 @@ export const [DataProvider, useData] = createContextHook(() => {
   const [matches, setMatches] = useState<Map<string, Match>>(new Map());
   const [messages, setMessages] = useState<Map<string, Message[]>>(new Map());
   const [swipes, setSwipes] = useState<Swipe[]>([]);
+  const [supabaseUsers, setSupabaseUsers] = useState<User[]>([]);
+
+  /* -------------------------------------------------------
+     FETCH ALL USERS FROM SUPABASE
+  ------------------------------------------------------- */
+  const allUsersQuery = useQuery({
+    queryKey: ['all-users'],
+    enabled: !!currentUser,
+    queryFn: async () => {
+      console.log('[Data] Fetching all users from Supabase');
+      const { data, error } = await supabase
+        .from('users')
+        .select('*');
+
+      if (error) {
+        console.log('[Data] Fetch users error:', error.message);
+        return [];
+      }
+
+      console.log('[Data] Fetched users from Supabase:', data?.length ?? 0);
+      return (data ?? []).map((d: any): User => ({
+        id: d.id ?? '',
+        phone_number: d.phone_number ?? '',
+        phone_verified: d.phone_verified ?? false,
+        school_email: d.school_email ?? '',
+        password: '',
+        university: d.university ?? '',
+        is_verified_esu: d.is_verified_esu ?? false,
+        first_name: d.first_name ?? '',
+        age: d.age ?? 0,
+        gender: d.gender ?? 'prefer not to say',
+        pronouns: d.pronouns ?? '',
+        dating_preference: d.dating_preference ?? 'both',
+        wants_friends: d.wants_friends ?? false,
+        wants_dating: d.wants_dating ?? false,
+        photo1_url: d.photo1_url ?? '',
+        photo2_url: d.photo2_url ?? '',
+        photo3_url: d.photo3_url ?? '',
+        photo4_url: d.photo4_url ?? '',
+        photo5_url: d.photo5_url ?? '',
+        photo6_url: d.photo6_url ?? '',
+        bio: d.bio ?? '',
+        major: d.major ?? '',
+        class_year: d.class_year ?? '',
+        interests: d.interests ?? '',
+        blocked_users: d.blocked_users ?? [],
+      }));
+    },
+    staleTime: 60000,
+  });
+
+  useEffect(() => {
+    if (allUsersQuery.data) {
+      setSupabaseUsers(allUsersQuery.data);
+      console.log('[Data] Supabase users loaded:', allUsersQuery.data.length);
+    }
+  }, [allUsersQuery.data]);
 
   /* -------------------------------------------------------
      LOAD MATCHES FROM SUPABASE (React Query)
@@ -304,43 +362,50 @@ export const [DataProvider, useData] = createContextHook(() => {
     },
     [persistMessages]
   );
+const getAllAvailableUsers = useCallback((): User[] => {
+  const userMap = new Map<string, User>();
+  for (const u of MOCK_USERS) {
+    userMap.set(u.id, u);
+  }
+  for (const u of supabaseUsers) {
+    userMap.set(u.id, u);
+  }
+  return Array.from(userMap.values());
+}, [supabaseUsers]);
+
 const getFilteredUsers = useCallback(
   (context: 'friends' | 'dating'): User[] => {
     if (!currentUser) return [];
 
     const blockedIds = currentUser.blocked_users || [];
+    const allUsers = getAllAvailableUsers();
 
-    // Users the current user already swiped on
+    console.log('[Data] getFilteredUsers context:', context, 'total users:', allUsers.length);
+
     const swipedUserIds = swipes
       .filter((s) => s.user_from === currentUser.id && s.context === context)
       .map((s) => s.user_to);
 
-    return MOCK_USERS.filter((u) => {
+    const filtered = allUsers.filter((u) => {
       if (u.id === currentUser.id) return false;
       if (swipedUserIds.includes(u.id)) return false;
       if (blockedIds.includes(u.id)) return false;
       if ((u.blocked_users || []).includes(currentUser.id)) return false;
 
-      // Must be same school + verified
-      if (u.university !== currentUser.university) return false;
-      if (!u.is_verified_esu) return false;
+      if (!u.first_name && !u.photo1_url) return false;
 
-      // FRIENDS MODE
       if (context === 'friends') {
-        return u.wants_friends && currentUser.wants_friends;
+        return true;
       }
 
-      // DATING MODE
       if (context === 'dating') {
         if (!u.wants_dating || !currentUser.wants_dating) return false;
 
-        // CURRENT USER'S preference
         if (currentUser.dating_preference === 'men' && u.gender !== 'man')
           return false;
         if (currentUser.dating_preference === 'women' && u.gender !== 'woman')
           return false;
 
-        // OTHER USER'S preference
         if (u.dating_preference === 'men' && currentUser.gender !== 'man')
           return false;
         if (u.dating_preference === 'women' && currentUser.gender !== 'woman')
@@ -351,8 +416,11 @@ const getFilteredUsers = useCallback(
 
       return true;
     });
+
+    console.log('[Data] Filtered users for', context, ':', filtered.length);
+    return filtered;
   },
-  [currentUser, swipes]
+  [currentUser, swipes, getAllAvailableUsers]
 );
 
   return {

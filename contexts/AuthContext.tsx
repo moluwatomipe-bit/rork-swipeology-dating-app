@@ -181,7 +181,25 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if (updated.pronouns === undefined) updated.pronouns = '';
     setCurrentUser(updated);
     saveUser(updated);
-  }, [currentUser, saveUser]);
+
+    if (session?.user?.id) {
+      const syncData: Record<string, unknown> = { ...updates };
+      delete syncData.password;
+      delete syncData.id;
+      console.log('[Auth] Syncing user updates to Supabase:', Object.keys(syncData));
+      supabase
+        .from('users')
+        .update(syncData)
+        .eq('id', session.user.id)
+        .then(({ error }) => {
+          if (error) {
+            console.log('[Auth] Supabase sync error:', error.message);
+          } else {
+            console.log('[Auth] User updates synced to Supabase');
+          }
+        });
+    }
+  }, [currentUser, saveUser, session?.user?.id]);
 
   const { mutate: saveStep } = saveOnboardingStepMutation;
 

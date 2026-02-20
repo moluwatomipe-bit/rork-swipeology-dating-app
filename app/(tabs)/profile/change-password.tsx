@@ -8,22 +8,24 @@ import {
   Alert,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { Lock, Eye, EyeOff } from 'lucide-react-native';
+import { Lock, Eye, EyeOff, Mail } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/supabase';
 import Colors from '@/constants/colors';
 
 const theme = Colors.dark;
 
 export default function ChangePasswordScreen() {
-  const { currentUser, changePassword } = useAuth();
+  const { currentUser, changePassword, resetPassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [showPasswords, setShowPasswords] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isChanging, setIsChanging] = useState<boolean>(false);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
 
   if (!currentUser) {
     return (
@@ -36,24 +38,11 @@ export default function ChangePasswordScreen() {
     );
   }
 
-  if (!currentUser.phone_verified) {
-    router.replace({
-      pathname: '/(tabs)/profile/verify-phone' as any,
-      params: { redirect: 'password' },
-    });
-    return null;
-  }
-
   const handleChangePassword = async () => {
     setError('');
 
     if (!currentPassword.trim()) {
       setError('Please enter your current password');
-      return;
-    }
-    if (currentPassword !== currentUser.password) {
-      setError('Current password is incorrect');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
     if (newPassword.length < 6) {
@@ -67,16 +56,53 @@ export default function ChangePasswordScreen() {
 
     setIsChanging(true);
     try {
+      console.log('[ChangePassword] Verifying current password via Supabase');
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: currentUser.school_email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        console.log('[ChangePassword] Current password verification failed:', signInError.message);
+        setError('Current password is incorrect');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setIsChanging(false);
+        return;
+      }
+
       await changePassword(newPassword);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Success', 'Your password has been changed.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch (e) {
-      console.log('Change password error:', e);
-      setError('Failed to change password. Please try again.');
+    } catch (e: any) {
+      console.log('[ChangePassword] Error:', e);
+      setError(e?.message || 'Failed to change password. Please try again.');
     } finally {
       setIsChanging(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!currentUser.school_email) {
+      Alert.alert('Error', 'No email associated with your account.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await resetPassword(currentUser.school_email);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Reset Email Sent',
+        `A password reset link has been sent to ${currentUser.school_email}. Check your inbox and follow the link to reset your password.`,
+        [{ text: 'OK' }]
+      );
+    } catch (e: any) {
+      console.log('[ChangePassword] Reset error:', e);
+      Alert.alert('Error', e?.message || 'Failed to send reset email. Try again later.');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -172,6 +198,29 @@ export default function ChangePasswordScreen() {
             </Text>
           </LinearGradient>
         </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.resetButton, isResetting && styles.buttonDisabled]}
+          onPress={handleForgotPassword}
+          activeOpacity={0.8}
+          disabled={isResetting}
+          testID="forgot-password-btn"
+        >
+          <Mail size={18} color={theme.primary} />
+          <Text style={styles.resetButtonText}>
+            {isResetting ? 'Sending...' : 'Send Password Reset Email'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.resetHint}>
+          A reset link will be sent to your school email. Follow it to set a new password.
+        </Text>
       </View>
     </View>
   );
@@ -261,5 +310,44 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700' as const,
     color: '#fff',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.border,
+  },
+  dividerText: {
+    fontSize: 13,
+    color: theme.textMuted,
+    fontWeight: '500' as const,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: theme.surface,
+    borderRadius: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: theme.primary,
+  },
+  resetHint: {
+    fontSize: 13,
+    color: theme.textMuted,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 18,
   },
 });
