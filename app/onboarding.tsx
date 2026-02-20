@@ -1252,6 +1252,8 @@ export default function OnboardingScreen() {
               ...profileData,
               password: '',
               blocked_users: [] as string[],
+              icebreaker_answers: {} as Record<string, string>,
+              personality_badges: [] as string[],
             };
             await completeRegistration(localUser);
             goToStep('complete');

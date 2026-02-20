@@ -24,6 +24,8 @@ export interface User {
   class_year: string;
   interests: string;
   blocked_users: string[];
+  icebreaker_answers: Record<string, string>;
+  personality_badges: string[];
 }
 
 export interface Swipe {

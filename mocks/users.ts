@@ -27,6 +27,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2026',
     interests: 'hiking,coffee,photography,yoga',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Outdoor adventure', study_style: 'Coffee shop vibes', food: 'Sushi', social_battery: 'Selective socializer', music: 'A bit of everything' },
+    personality_badges: ['adventurer', 'early_bird', 'foodie'],
   },
   {
     id: 'user_2',
@@ -54,6 +56,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2025',
     interests: 'basketball,fitness,gaming,cooking',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Party with friends', study_style: 'Last-minute cramming', food: 'Pizza', social_battery: 'Always charged', music: 'Hip-hop/R&B' },
+    personality_badges: ['extrovert', 'gym_rat', 'gamer'],
   },
   {
     id: 'user_3',
@@ -81,6 +85,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2027',
     interests: 'art,plants,boba,music,reading',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Quiet reading time', study_style: 'Coffee shop vibes', food: 'Ramen', social_battery: 'Small groups only', music: 'Rock/Indie' },
+    personality_badges: ['introvert', 'creative', 'music_lover'],
   },
   {
     id: 'user_4',
@@ -108,6 +114,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2025',
     interests: 'coding,rock climbing,chess,anime',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Netflix & chill', study_style: 'Library all day', food: 'Ramen', social_battery: 'Recharge alone', music: 'A bit of everything' },
+    personality_badges: ['introvert', 'study_buddy', 'night_owl', 'gamer'],
   },
   {
     id: 'user_5',
@@ -135,6 +143,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2026',
     interests: 'karaoke,dancing,cooking,volunteering',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Party with friends', study_style: 'Study groups', food: 'Tacos', social_battery: 'Always charged', music: 'Pop' },
+    personality_badges: ['extrovert', 'foodie', 'music_lover'],
   },
   {
     id: 'user_6',
@@ -162,6 +172,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2026',
     interests: 'music,DJing,skateboarding,photography',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Exploring new places', study_style: 'Late night sessions', food: 'Pizza', social_battery: 'Depends on the day', music: 'EDM' },
+    personality_badges: ['creative', 'night_owl', 'adventurer', 'chill_vibes'],
   },
   {
     id: 'user_7',
@@ -189,6 +201,8 @@ export const MOCK_USERS: User[] = [
     class_year: '2027',
     interests: 'podcasts,coffee,writing,true crime',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Quiet reading time', study_style: 'Coffee shop vibes', food: 'Mac & cheese', social_battery: 'Selective socializer', music: 'Rock/Indie' },
+    personality_badges: ['introvert', 'creative', 'chill_vibes'],
   },
   {
     id: 'user_8',
@@ -216,5 +230,7 @@ export const MOCK_USERS: User[] = [
     class_year: '2026',
     interests: 'soccer,sustainability,thrifting,nature',
     blocked_users: [],
+    icebreaker_answers: { weekend: 'Outdoor adventure', study_style: 'Study groups', food: 'Sushi', social_battery: 'Selective socializer', music: 'Pop' },
+    personality_badges: ['adventurer', 'early_bird', 'gym_rat'],
   },
 ];

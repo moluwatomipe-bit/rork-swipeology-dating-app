@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,12 +21,16 @@ import {
   Sparkles,
   BookOpen,
   GraduationCap,
+  Zap,
+  ChevronUp,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { User, Match } from '@/types';
+import { PERSONALITY_BADGES, ICEBREAKER_QUESTIONS } from '@/constants/matching';
+import { calculateCompatibility, getCompatibilityLabel } from '@/lib/compatibility';
 import Colors from '@/constants/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -40,6 +45,7 @@ export default function SwipeScreen() {
   const [cardIndex, setCardIndex] = useState<number>(0);
   const [matchPopup, setMatchPopup] = useState<{ match: Match; user: User } | null>(null);
   const [isSwiping, setIsSwiping] = useState<boolean>(false);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
 
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
@@ -62,6 +68,16 @@ export default function SwipeScreen() {
   const currentCard = users[cardIndex] || null;
   const nextCard = users[cardIndex + 1] || null;
 
+  const compatibility = useMemo(() => {
+    if (!currentUser || !currentCard) return null;
+    return calculateCompatibility(currentUser, currentCard);
+  }, [currentUser, currentCard]);
+
+  const compatLabel = useMemo(() => {
+    if (!compatibility) return null;
+    return getCompatibilityLabel(compatibility.score);
+  }, [compatibility]);
+
   const resetPosition = useCallback(() => {
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
@@ -76,6 +92,7 @@ export default function SwipeScreen() {
     const toValue = direction === 'right' ? SCREEN_WIDTH + 100 : -SCREEN_WIDTH - 100;
 
     setIsSwiping(true);
+    setShowDetails(false);
 
     Haptics.impactAsync(
       liked ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light
@@ -104,7 +121,7 @@ export default function SwipeScreen() {
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => !isSwiping,
+        onStartShouldSetPanResponder: () => !isSwiping && !showDetails,
         onPanResponderMove: (_, gesture) => {
           position.setValue({ x: gesture.dx, y: gesture.dy * 0.3 });
         },
@@ -118,15 +135,33 @@ export default function SwipeScreen() {
           }
         },
       }),
-    [swipeCard, resetPosition, position, isSwiping]
+    [swipeCard, resetPosition, position, isSwiping, showDetails]
   );
 
   const handleTabChange = useCallback((tab: 'friends' | 'dating') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveTab(tab);
     setCardIndex(0);
+    setShowDetails(false);
     position.setValue({ x: 0, y: 0 });
   }, [position]);
+
+  const getUserBadges = (user: User) => {
+    const badges = user.personality_badges || [];
+    return badges
+      .map((id) => PERSONALITY_BADGES.find((b) => b.id === id))
+      .filter(Boolean);
+  };
+
+  const getUserIcebreakerHighlight = (user: User) => {
+    const answers = user.icebreaker_answers || {};
+    const keys = Object.keys(answers);
+    if (keys.length === 0) return null;
+    const randomKey = keys[0];
+    const question = ICEBREAKER_QUESTIONS.find((q) => q.id === randomKey);
+    if (!question) return null;
+    return { question: question.question, answer: answers[randomKey] };
+  };
 
   const renderCard = (user: User, isTop: boolean) => {
     const cardStyle = isTop
@@ -143,6 +178,11 @@ export default function SwipeScreen() {
       ? user.interests.split(',').map((i) => i.trim()).filter(Boolean)
       : [];
 
+    const badges = getUserBadges(user);
+    const icebreaker = getUserIcebreakerHighlight(user);
+    const cardCompat = isTop && currentUser ? calculateCompatibility(currentUser, user) : null;
+    const cardCompatLabel = cardCompat ? getCompatibilityLabel(cardCompat.score) : null;
+
     return (
       <Animated.View
         key={user.id}
@@ -155,10 +195,22 @@ export default function SwipeScreen() {
           contentFit="cover"
         />
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.85)']}
+          colors={['transparent', 'rgba(0,0,0,0.9)']}
           style={styles.cardGradient}
         >
           <View style={styles.cardInfo}>
+            {isTop && cardCompat && cardCompatLabel && (
+              <View style={[styles.compatBadge, { backgroundColor: cardCompatLabel.color + '30' }]}>
+                <Zap size={12} color={cardCompatLabel.color} />
+                <Text style={[styles.compatScore, { color: cardCompatLabel.color }]}>
+                  {cardCompat.score}%
+                </Text>
+                <Text style={[styles.compatLabel, { color: cardCompatLabel.color }]}>
+                  {cardCompatLabel.label}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.cardNameRow}>
               <Text style={styles.cardName}>{user.first_name}, {user.age}</Text>
               {user.is_verified_esu && (
@@ -167,6 +219,7 @@ export default function SwipeScreen() {
                 </View>
               )}
             </View>
+
             {user.major ? (
               <View style={styles.cardDetail}>
                 <BookOpen size={14} color="rgba(255,255,255,0.7)" />
@@ -179,17 +232,57 @@ export default function SwipeScreen() {
                 <Text style={styles.cardDetailText}>Class of {user.class_year}</Text>
               </View>
             ) : null}
-            {user.bio ? (
-              <Text style={styles.cardBio} numberOfLines={2}>{user.bio}</Text>
-            ) : null}
-            {interestsList.length > 0 && (
-              <View style={styles.interestsRow}>
-                {interestsList.slice(0, 4).map((interest) => (
-                  <View key={interest} style={styles.interestTag}>
-                    <Text style={styles.interestText}>{interest}</Text>
+
+            {badges.length > 0 && (
+              <View style={styles.badgesRow}>
+                {badges.slice(0, 4).map((badge) => badge && (
+                  <View
+                    key={badge.id}
+                    style={[styles.cardBadge, { backgroundColor: badge.color + '35' }]}
+                  >
+                    <Text style={styles.cardBadgeEmoji}>{badge.emoji}</Text>
+                    <Text style={[styles.cardBadgeText, { color: badge.color }]}>{badge.label}</Text>
                   </View>
                 ))}
               </View>
+            )}
+
+            {user.bio ? (
+              <Text style={styles.cardBio} numberOfLines={2}>{user.bio}</Text>
+            ) : null}
+
+            {interestsList.length > 0 && (
+              <View style={styles.interestsRow}>
+                {interestsList.slice(0, 4).map((interest) => (
+                  <View key={interest} style={[
+                    styles.interestTag,
+                    isTop && cardCompat && cardCompat.sharedInterests.includes(interest.toLowerCase())
+                      ? styles.interestTagShared
+                      : null,
+                  ]}>
+                    <Text style={[
+                      styles.interestText,
+                      isTop && cardCompat && cardCompat.sharedInterests.includes(interest.toLowerCase())
+                        ? styles.interestTextShared
+                        : null,
+                    ]}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {isTop && icebreaker && (
+              <TouchableOpacity
+                style={styles.icebreakerPreview}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowDetails(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <ChevronUp size={14} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.icebreakerPreviewText}>Tap for more details</Text>
+              </TouchableOpacity>
             )}
           </View>
         </LinearGradient>
@@ -205,6 +298,164 @@ export default function SwipeScreen() {
           </>
         )}
       </Animated.View>
+    );
+  };
+
+  const renderDetailsModal = () => {
+    if (!currentCard || !currentUser) return null;
+
+    const badges = getUserBadges(currentCard);
+    const answers = currentCard.icebreaker_answers || {};
+    const myAnswers = currentUser.icebreaker_answers || {};
+    const interestsList = currentCard.interests
+      ? currentCard.interests.split(',').map((i) => i.trim()).filter(Boolean)
+      : [];
+
+    return (
+      <Modal
+        visible={showDetails}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDetails(false)}
+      >
+        <View style={styles.detailsOverlay}>
+          <TouchableOpacity
+            style={styles.detailsDismiss}
+            onPress={() => setShowDetails(false)}
+            activeOpacity={1}
+          />
+          <View style={styles.detailsSheet}>
+            <View style={styles.detailsHandle} />
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.detailsScroll}>
+              <View style={styles.detailsHeader}>
+                <Text style={styles.detailsName}>{currentCard.first_name}, {currentCard.age}</Text>
+                {compatibility && compatLabel && (
+                  <View style={[styles.detailsCompatBadge, { backgroundColor: compatLabel.color + '20' }]}>
+                    <Zap size={14} color={compatLabel.color} />
+                    <Text style={[styles.detailsCompatText, { color: compatLabel.color }]}>
+                      {compatibility.score}% {compatLabel.label}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {currentCard.bio ? (
+                <Text style={styles.detailsBio}>{currentCard.bio}</Text>
+              ) : null}
+
+              {badges.length > 0 && (
+                <View style={styles.detailsSection}>
+                  <Text style={styles.detailsSectionTitle}>Personality</Text>
+                  <View style={styles.detailsBadges}>
+                    {badges.map((badge) => badge && (
+                      <View
+                        key={badge.id}
+                        style={[styles.detailBadgeChip, { backgroundColor: badge.color + '20', borderColor: badge.color + '40' }]}
+                      >
+                        <Text style={styles.detailBadgeEmoji}>{badge.emoji}</Text>
+                        <Text style={[styles.detailBadgeLabel, { color: badge.color }]}>{badge.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {interestsList.length > 0 && (
+                <View style={styles.detailsSection}>
+                  <Text style={styles.detailsSectionTitle}>Interests</Text>
+                  <View style={styles.detailsInterests}>
+                    {interestsList.map((interest) => {
+                      const isShared = compatibility?.sharedInterests.includes(interest.toLowerCase());
+                      return (
+                        <View
+                          key={interest}
+                          style={[
+                            styles.detailInterestChip,
+                            isShared && styles.detailInterestChipShared,
+                          ]}
+                        >
+                          <Text style={[
+                            styles.detailInterestText,
+                            isShared && styles.detailInterestTextShared,
+                          ]}>
+                            {interest}
+                            {isShared ? ' \u2728' : ''}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  {compatibility && compatibility.sharedInterests.length > 0 && (
+                    <Text style={styles.sharedHint}>
+                      {compatibility.sharedInterests.length} shared interest{compatibility.sharedInterests.length > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {Object.keys(answers).length > 0 && (
+                <View style={styles.detailsSection}>
+                  <Text style={styles.detailsSectionTitle}>Icebreakers</Text>
+                  {ICEBREAKER_QUESTIONS.filter((q) => answers[q.id]).map((q) => {
+                    const theirAnswer = answers[q.id];
+                    const myAnswer = myAnswers[q.id];
+                    const isMatch = myAnswer && myAnswer === theirAnswer;
+                    return (
+                      <View key={q.id} style={styles.icebreakerItem}>
+                        <Text style={styles.icebreakerItemQ}>{q.question}</Text>
+                        <View style={styles.icebreakerAnswerRow}>
+                          <View style={[
+                            styles.icebreakerAnswerChip,
+                            isMatch && styles.icebreakerAnswerChipMatch,
+                          ]}>
+                            <Text style={[
+                              styles.icebreakerAnswerText,
+                              isMatch && styles.icebreakerAnswerTextMatch,
+                            ]}>
+                              {theirAnswer}
+                            </Text>
+                          </View>
+                          {isMatch && (
+                            <Text style={styles.icebreakerMatchLabel}>Same as you!</Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {compatibility && (
+                <View style={styles.detailsSection}>
+                  <Text style={styles.detailsSectionTitle}>Compatibility Breakdown</Text>
+                  <View style={styles.compatBreakdown}>
+                    <View style={styles.compatRow}>
+                      <Text style={styles.compatRowLabel}>Shared Interests</Text>
+                      <Text style={styles.compatRowValue}>{compatibility.sharedInterests.length}</Text>
+                    </View>
+                    <View style={styles.compatRow}>
+                      <Text style={styles.compatRowLabel}>Same Major</Text>
+                      <Text style={[styles.compatRowValue, compatibility.sameMajor ? { color: '#10B981' } : {}]}>
+                        {compatibility.sameMajor ? 'Yes' : 'No'}
+                      </Text>
+                    </View>
+                    <View style={styles.compatRow}>
+                      <Text style={styles.compatRowLabel}>Icebreaker Matches</Text>
+                      <Text style={styles.compatRowValue}>{compatibility.icebreakerMatches}</Text>
+                    </View>
+                    <View style={styles.compatRow}>
+                      <Text style={styles.compatRowLabel}>Badge Overlap</Text>
+                      <Text style={styles.compatRowValue}>{compatibility.badgeOverlap}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              <View style={{ height: 30 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     );
   };
 
@@ -283,6 +534,8 @@ export default function SwipeScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {renderDetailsModal()}
 
       <Modal
         visible={matchPopup !== null}
@@ -419,12 +672,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '50%',
+    height: '60%',
     justifyContent: 'flex-end',
-    padding: 20,
+    padding: 16,
   },
   cardInfo: {
-    gap: 6,
+    gap: 5,
+  },
+  compatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    marginBottom: 4,
+  },
+  compatScore: {
+    fontSize: 13,
+    fontWeight: '800' as const,
+  },
+  compatLabel: {
+    fontSize: 11,
+    fontWeight: '600' as const,
   },
   cardNameRow: {
     flexDirection: 'row',
@@ -453,27 +724,70 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
   },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 2,
+  },
+  cardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  cardBadgeEmoji: {
+    fontSize: 11,
+  },
+  cardBadgeText: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+  },
   cardBio: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.9)',
-    lineHeight: 20,
-    marginTop: 4,
+    lineHeight: 18,
+    marginTop: 2,
   },
   interestsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
+    gap: 5,
+    marginTop: 4,
   },
   interestTag: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  interestTagShared: {
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.5)',
   },
   interestText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#fff',
+    fontWeight: '500' as const,
+  },
+  interestTextShared: {
+    color: '#6EE7B7',
+    fontWeight: '700' as const,
+  },
+  icebreakerPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  icebreakerPreviewText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500' as const,
   },
   stampContainer: {
@@ -604,5 +918,190 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 8,
+  },
+  detailsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  detailsDismiss: {
+    flex: 1,
+  },
+  detailsSheet: {
+    backgroundColor: theme.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.7,
+    paddingTop: 12,
+  },
+  detailsHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.border,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  detailsScroll: {
+    paddingHorizontal: 22,
+  },
+  detailsHeader: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  detailsName: {
+    fontSize: 24,
+    fontWeight: '800' as const,
+    color: theme.text,
+  },
+  detailsCompatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  detailsCompatText: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
+  detailsBio: {
+    fontSize: 15,
+    color: theme.textSecondary,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  detailsSection: {
+    marginBottom: 20,
+  },
+  detailsSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: theme.textMuted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  detailsBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  detailBadgeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  detailBadgeEmoji: {
+    fontSize: 16,
+  },
+  detailBadgeLabel: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  detailsInterests: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  detailInterestChip: {
+    backgroundColor: theme.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  detailInterestChipShared: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  detailInterestText: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    fontWeight: '500' as const,
+  },
+  detailInterestTextShared: {
+    color: '#6EE7B7',
+    fontWeight: '700' as const,
+  },
+  sharedHint: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600' as const,
+    marginTop: 8,
+  },
+  icebreakerItem: {
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  icebreakerItemQ: {
+    fontSize: 13,
+    color: theme.textMuted,
+    fontWeight: '600' as const,
+    marginBottom: 6,
+  },
+  icebreakerAnswerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  icebreakerAnswerChip: {
+    backgroundColor: theme.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  icebreakerAnswerChipMatch: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  icebreakerAnswerText: {
+    fontSize: 14,
+    color: theme.text,
+    fontWeight: '500' as const,
+  },
+  icebreakerAnswerTextMatch: {
+    color: '#6EE7B7',
+    fontWeight: '700' as const,
+  },
+  icebreakerMatchLabel: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '700' as const,
+  },
+  compatBreakdown: {
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: 'hidden',
+  },
+  compatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  compatRowLabel: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  compatRowValue: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: theme.text,
   },
 });

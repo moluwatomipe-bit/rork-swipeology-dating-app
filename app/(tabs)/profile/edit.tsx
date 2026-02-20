@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { Camera, X, Check } from 'lucide-react-native';
+import { Camera, X, Check, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +17,7 @@ import { Image } from 'expo-image';
 import { useAuth } from '@/contexts/AuthContext';
 import { User } from '@/types';
 import { fetchPronouns, PronounOption } from '@/lib/pronouns';
+import { ICEBREAKER_QUESTIONS, PERSONALITY_BADGES, MAX_BADGES } from '@/constants/matching';
 import Colors from '@/constants/colors';
 
 const theme = Colors.dark;
@@ -44,6 +45,14 @@ export default function EditProfileScreen() {
     currentUser?.photo5_url || '',
     currentUser?.photo6_url || '',
   ]);
+
+  const [icebreakerAnswers, setIcebreakerAnswers] = useState<Record<string, string>>(
+    currentUser?.icebreaker_answers || {}
+  );
+  const [expandedIcebreaker, setExpandedIcebreaker] = useState<string | null>(null);
+  const [selectedBadges, setSelectedBadges] = useState<string[]>(
+    currentUser?.personality_badges || []
+  );
 
   if (!currentUser) {
     return (
@@ -81,6 +90,26 @@ export default function EditProfileScreen() {
     setPhotos(newPhotos);
   };
 
+  const handleToggleBadge = (badgeId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedBadges((prev) => {
+      if (prev.includes(badgeId)) {
+        return prev.filter((b) => b !== badgeId);
+      }
+      if (prev.length >= MAX_BADGES) {
+        Alert.alert('Limit reached', `You can select up to ${MAX_BADGES} badges.`);
+        return prev;
+      }
+      return [...prev, badgeId];
+    });
+  };
+
+  const handleSelectIcebreaker = (questionId: string, answer: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIcebreakerAnswers((prev) => ({ ...prev, [questionId]: answer }));
+    setExpandedIcebreaker(null);
+  };
+
   const handleSave = () => {
     if (!firstName.trim()) {
       Alert.alert('Error', 'Please enter your first name');
@@ -101,6 +130,8 @@ export default function EditProfileScreen() {
       photo4_url: photos[3],
       photo5_url: photos[4],
       photo6_url: photos[5],
+      icebreaker_answers: icebreakerAnswers,
+      personality_badges: selectedBadges,
     } as User);
 
     Alert.alert('Saved', 'Your profile has been updated.', [
@@ -254,6 +285,108 @@ export default function EditProfileScreen() {
           />
         </View>
 
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionLabel}>Personality Badges</Text>
+        <Text style={styles.sectionHint}>
+          Pick up to {MAX_BADGES} that describe you ({selectedBadges.length}/{MAX_BADGES})
+        </Text>
+        <View style={styles.badgeGrid}>
+          {PERSONALITY_BADGES.map((badge) => {
+            const isSelected = selectedBadges.includes(badge.id);
+            return (
+              <TouchableOpacity
+                key={badge.id}
+                style={[
+                  styles.badgeChip,
+                  isSelected && { backgroundColor: badge.color + '25', borderColor: badge.color },
+                ]}
+                onPress={() => handleToggleBadge(badge.id)}
+                activeOpacity={0.7}
+                testID={`badge-${badge.id}`}
+              >
+                <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
+                <Text
+                  style={[
+                    styles.badgeLabel,
+                    isSelected && { color: badge.color, fontWeight: '700' as const },
+                  ]}
+                >
+                  {badge.label}
+                </Text>
+                {isSelected && (
+                  <View style={[styles.badgeCheck, { backgroundColor: badge.color }]}>
+                    <Check size={10} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionLabel}>Icebreakers</Text>
+        <Text style={styles.sectionHint}>
+          Answer these to improve your match quality
+        </Text>
+        {ICEBREAKER_QUESTIONS.map((q) => {
+          const currentAnswer = icebreakerAnswers[q.id] || '';
+          const isExpanded = expandedIcebreaker === q.id;
+          return (
+            <View key={q.id} style={styles.icebreakerCard}>
+              <TouchableOpacity
+                style={styles.icebreakerHeader}
+                onPress={() => setExpandedIcebreaker(isExpanded ? null : q.id)}
+                activeOpacity={0.7}
+                testID={`icebreaker-${q.id}`}
+              >
+                <View style={styles.icebreakerHeaderLeft}>
+                  <Text style={styles.icebreakerQuestion}>{q.question}</Text>
+                  {currentAnswer ? (
+                    <Text style={styles.icebreakerCurrentAnswer}>{currentAnswer}</Text>
+                  ) : (
+                    <Text style={styles.icebreakerPlaceholder}>Tap to answer</Text>
+                  )}
+                </View>
+                <ChevronDown
+                  size={18}
+                  color={theme.textMuted}
+                  style={isExpanded ? { transform: [{ rotate: '180deg' }] } : undefined}
+                />
+              </TouchableOpacity>
+              {isExpanded && (
+                <View style={styles.icebreakerOptions}>
+                  {q.options.map((opt) => {
+                    const isActive = currentAnswer === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          styles.icebreakerOption,
+                          isActive && styles.icebreakerOptionActive,
+                        ]}
+                        onPress={() => handleSelectIcebreaker(q.id, opt)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.icebreakerOptionText,
+                            isActive && styles.icebreakerOptionTextActive,
+                          ]}
+                        >
+                          {opt}
+                        </Text>
+                        {isActive && <Check size={14} color={theme.primary} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          );
+        })}
+
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8}>
           <LinearGradient
             colors={['#A855F7', '#EC4899']}
@@ -294,13 +427,24 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
     textTransform: 'uppercase' as const,
     letterSpacing: 0.8,
-    marginBottom: 12,
+    marginBottom: 6,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginBottom: 14,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: 22,
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 24,
+    marginTop: 6,
   },
   photoBox: {
     width: '30.5%',
@@ -374,7 +518,7 @@ const styles = StyleSheet.create({
   saveButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    marginTop: 8,
+    marginTop: 20,
   },
   buttonGradient: {
     flexDirection: 'row',
@@ -412,6 +556,97 @@ const styles = StyleSheet.create({
     color: theme.text,
   },
   pronounOptionTextSelected: {
+    color: theme.primary,
+    fontWeight: '600' as const,
+  },
+  badgeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  badgeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: theme.surface,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+  },
+  badgeEmoji: {
+    fontSize: 16,
+  },
+  badgeLabel: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: theme.textSecondary,
+  },
+  badgeCheck: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  icebreakerCard: {
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  icebreakerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  icebreakerHeaderLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  icebreakerQuestion: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: theme.text,
+    marginBottom: 2,
+  },
+  icebreakerCurrentAnswer: {
+    fontSize: 13,
+    color: theme.primary,
+    fontWeight: '500' as const,
+  },
+  icebreakerPlaceholder: {
+    fontSize: 13,
+    color: theme.textMuted,
+  },
+  icebreakerOptions: {
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  icebreakerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  icebreakerOptionActive: {
+    backgroundColor: `${theme.primary}12`,
+  },
+  icebreakerOptionText: {
+    fontSize: 15,
+    color: theme.textSecondary,
+  },
+  icebreakerOptionTextActive: {
     color: theme.primary,
     fontWeight: '600' as const,
   },

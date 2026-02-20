@@ -81,6 +81,8 @@ export const [DataProvider, useData] = createContextHook(() => {
         class_year: d.class_year ?? '',
         interests: d.interests ?? '',
         blocked_users: d.blocked_users ?? [],
+        icebreaker_answers: d.icebreaker_answers ?? {},
+        personality_badges: d.personality_badges ?? [],
       }));
     },
     staleTime: 60000,

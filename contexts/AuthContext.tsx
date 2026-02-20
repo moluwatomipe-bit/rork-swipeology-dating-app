@@ -61,6 +61,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           class_year: data.class_year ?? '',
           interests: data.interests ?? '',
           blocked_users: data.blocked_users ?? [],
+          icebreaker_answers: data.icebreaker_answers ?? {},
+          personality_badges: data.personality_badges ?? [],
         };
         return profile;
       }
@@ -179,6 +181,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if (updated.blocked_users === undefined) updated.blocked_users = [];
     if (updated.phone_verified === undefined) updated.phone_verified = false;
     if (updated.pronouns === undefined) updated.pronouns = '';
+    if (updated.icebreaker_answers === undefined) updated.icebreaker_answers = {};
+    if (updated.personality_badges === undefined) updated.personality_badges = [];
     setCurrentUser(updated);
     saveUser(updated);
 
