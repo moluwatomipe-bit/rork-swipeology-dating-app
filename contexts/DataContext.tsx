@@ -448,38 +448,63 @@ const getAllAvailableUsers = useCallback((): User[] => {
 
 const getFilteredUsers = useCallback(
   (context: 'friends' | 'dating'): User[] => {
-    if (!currentUser) return [];
+    if (!currentUser) {
+      console.log('[Data] getFilteredUsers: no currentUser');
+      return [];
+    }
 
     const blockedIds = currentUser.blocked_users || [];
     const allUsers = getAllAvailableUsers();
 
-    console.log('[Data] getFilteredUsers context:', context, 'total users:', allUsers.length);
+    console.log('[Data] getFilteredUsers context:', context, 'total users:', allUsers.length, 'currentUser:', currentUser.id);
+
+    if (allUsers.length > 0) {
+      allUsers.forEach((u, i) => {
+        console.log(`[Data] User[${i}]: id=${u.id}, name=${u.first_name}, gender=${u.gender}, wants_friends=${u.wants_friends}, wants_dating=${u.wants_dating}, pref=${u.dating_preference}`);
+      });
+    }
 
     const swipedUserIds = swipes
       .filter((s) => s.user_from === currentUser.id && s.context === context)
       .map((s) => s.user_to);
 
+    console.log('[Data] Swiped user IDs for', context, ':', swipedUserIds.length, swipedUserIds);
+
     const filtered = allUsers.filter((u) => {
-      if (u.id === currentUser.id) return false;
-      if (swipedUserIds.includes(u.id)) return false;
-      if (blockedIds.includes(u.id)) return false;
-      if ((u.blocked_users || []).includes(currentUser.id)) return false;
+      if (u.id === currentUser.id) {
+        console.log('[Data] Skipping self:', u.id);
+        return false;
+      }
+      if (swipedUserIds.includes(u.id)) {
+        console.log('[Data] Skipping already swiped:', u.id, u.first_name);
+        return false;
+      }
+      if (blockedIds.includes(u.id)) {
+        console.log('[Data] Skipping blocked:', u.id);
+        return false;
+      }
+      if ((u.blocked_users || []).includes(currentUser.id)) {
+        console.log('[Data] Skipping reverse blocked:', u.id);
+        return false;
+      }
 
-      if (!u.first_name) return false;
-
-      if (context === 'friends') {
-        return true;
+      if (!u.first_name || u.first_name.trim() === '') {
+        console.log('[Data] Skipping no name:', u.id);
+        return false;
       }
 
       if (context === 'dating') {
-        if (currentUser.dating_preference === 'men' && u.gender !== 'man')
+        if (currentUser.dating_preference === 'men' && u.gender !== 'man') {
+          console.log('[Data] Skipping dating pref mismatch:', u.id, u.first_name, 'gender:', u.gender, 'my pref:', currentUser.dating_preference);
           return false;
-        if (currentUser.dating_preference === 'women' && u.gender !== 'woman')
+        }
+        if (currentUser.dating_preference === 'women' && u.gender !== 'woman') {
+          console.log('[Data] Skipping dating pref mismatch:', u.id, u.first_name, 'gender:', u.gender, 'my pref:', currentUser.dating_preference);
           return false;
-
-        return true;
+        }
       }
 
+      console.log('[Data] Including user:', u.id, u.first_name, 'in', context);
       return true;
     });
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
-import { supabase } from '@/supabase';
+import { supabase, getResetPasswordRedirectUrl } from '@/supabase';
 import { User, OnboardingStep } from '@/types';
 import type { Session } from '@supabase/supabase-js';
 
@@ -347,8 +347,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ email }: { email: string }) => {
-      console.log('[Auth] Sending password reset to:', email);
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const redirectTo = getResetPasswordRedirectUrl();
+      console.log('[Auth] Sending password reset to:', email, 'redirectTo:', redirectTo);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
       if (error) {
         console.log('[Auth] Reset password error:', error.message);
         throw new Error(error.message);
