@@ -77,84 +77,85 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   /* -------------------------------------------------------
      FETCH ALL USERS FROM SUPABASE
+     Uses select('*') to avoid column-name mismatches that
+     would silently return zero rows.
   ------------------------------------------------------- */
-  const SAFE_USER_COLUMNS = [
-    'id',
-    'phone_number',
-    'phone_verified',
-    'school_email',
-    'university',
-    'is_verified_esu',
-    'first_name',
-    'age',
-    'gender',
-    'pronouns',
-    'dating_preference',
-    'wants_friends',
-    'wants_dating',
-    'photo1_url',
-    'photo2_url',
-    'photo3_url',
-    'photo4_url',
-    'photo5_url',
-    'photo6_url',
-    'bio',
-    'major',
-    'class_year',
-    'interests',
-    'blocked_users',
-  ].join(',');
+  const mapRowToUser = (d: Record<string, any>): User => {
+    const mode = d.mode ?? '';
+    const wantsFriends = d.wants_friends ?? (mode === 'friends' || mode === 'both') ?? false;
+    const wantsDating = d.wants_dating ?? (mode === 'dating' || mode === 'both') ?? false;
+    const datingPref = d.dating_preference ?? d.gender_preference ?? 'both';
+
+    return {
+      id: d.id ?? '',
+      phone_number: d.phone_number ?? '',
+      phone_verified: d.phone_verified ?? false,
+      school_email: d.school_email ?? d.email ?? '',
+      password: '',
+      university: d.university ?? '',
+      is_verified_esu: d.is_verified_esu ?? d.verified ?? false,
+      first_name: d.first_name ?? d.name ?? '',
+      age: d.age ?? 0,
+      gender: d.gender ?? 'prefer not to say',
+      pronouns: d.pronouns ?? '',
+      dating_preference: datingPref,
+      wants_friends: wantsFriends,
+      wants_dating: wantsDating,
+      photo1_url: d.photo1_url ?? d.photo_url ?? d.avatar_url ?? '',
+      photo2_url: d.photo2_url ?? '',
+      photo3_url: d.photo3_url ?? '',
+      photo4_url: d.photo4_url ?? '',
+      photo5_url: d.photo5_url ?? '',
+      photo6_url: d.photo6_url ?? '',
+      bio: d.bio ?? '',
+      major: d.major ?? '',
+      class_year: d.class_year ?? '',
+      interests: d.interests ?? '',
+      blocked_users: d.blocked_users ?? [],
+      icebreaker_answers: d.icebreaker_answers ?? {},
+      personality_badges: d.personality_badges ?? [],
+    };
+  };
 
   const allUsersQuery = useQuery({
     queryKey: ['all-users'],
     enabled: !!currentUser,
     queryFn: async () => {
-      console.log('[Data] Fetching all users from Supabase (safe columns)');
+      console.log('[Data] Fetching ALL users from Supabase with select("*")');
       const { data, error } = await supabase
         .from('users')
-        .select(SAFE_USER_COLUMNS);
+        .select('*');
 
       if (error) {
         console.log('[Data] Fetch users error:', error.message, JSON.stringify(error));
-        return [];
+        console.log('[Data] Trying profiles table as fallback...');
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*');
+
+        if (profileError) {
+          console.log('[Data] Profiles fallback error:', profileError.message);
+          return [];
+        }
+
+        const profileRows = (profileData ?? []) as Record<string, any>[];
+        console.log('[Data] Fetched from profiles table:', profileRows.length);
+        if (profileRows.length > 0) {
+          console.log('[Data] Sample profile keys:', Object.keys(profileRows[0]));
+        }
+        return profileRows.map(mapRowToUser);
       }
 
       const rows = (data ?? []) as Record<string, any>[];
       console.log('[Data] Fetched users from Supabase:', rows.length);
       if (rows.length > 0) {
         console.log('[Data] Sample user keys:', Object.keys(rows[0]));
-        console.log('[Data] Sample user first_name:', rows[0].first_name, 'id:', rows[0].id);
+        console.log('[Data] Sample user data:', JSON.stringify(rows[0]).slice(0, 500));
+      } else {
+        console.log('[Data] WARNING: users table returned 0 rows');
       }
 
-      return rows.map((d: any): User => ({
-        id: d.id ?? '',
-        phone_number: d.phone_number ?? '',
-        phone_verified: d.phone_verified ?? false,
-        school_email: d.school_email ?? '',
-        password: '',
-        university: d.university ?? '',
-        is_verified_esu: d.is_verified_esu ?? false,
-        first_name: d.first_name ?? '',
-        age: d.age ?? 0,
-        gender: d.gender ?? 'prefer not to say',
-        pronouns: d.pronouns ?? '',
-        dating_preference: d.dating_preference ?? 'both',
-        wants_friends: d.wants_friends ?? false,
-        wants_dating: d.wants_dating ?? false,
-        photo1_url: d.photo1_url ?? '',
-        photo2_url: d.photo2_url ?? '',
-        photo3_url: d.photo3_url ?? '',
-        photo4_url: d.photo4_url ?? '',
-        photo5_url: d.photo5_url ?? '',
-        photo6_url: d.photo6_url ?? '',
-        bio: d.bio ?? '',
-        major: d.major ?? '',
-        class_year: d.class_year ?? '',
-        interests: d.interests ?? '',
-        blocked_users: d.blocked_users ?? [],
-        icebreaker_answers: {},
-        personality_badges: [],
-      }));
+      return rows.map(mapRowToUser);
     },
     staleTime: 30000,
     refetchOnMount: 'always' as const,
@@ -472,39 +473,40 @@ const getFilteredUsers = useCallback(
 
     const filtered = allUsers.filter((u) => {
       if (u.id === currentUser.id) {
-        console.log('[Data] Skipping self:', u.id);
         return false;
       }
       if (swipedUserIds.includes(u.id)) {
-        console.log('[Data] Skipping already swiped:', u.id, u.first_name);
         return false;
       }
       if (blockedIds.includes(u.id)) {
-        console.log('[Data] Skipping blocked:', u.id);
         return false;
       }
       if ((u.blocked_users || []).includes(currentUser.id)) {
-        console.log('[Data] Skipping reverse blocked:', u.id);
         return false;
       }
 
       if (!u.first_name || u.first_name.trim() === '') {
-        console.log('[Data] Skipping no name:', u.id);
         return false;
       }
 
-      if (context === 'dating') {
-        if (currentUser.dating_preference === 'men' && u.gender !== 'man') {
-          console.log('[Data] Skipping dating pref mismatch:', u.id, u.first_name, 'gender:', u.gender, 'my pref:', currentUser.dating_preference);
-          return false;
-        }
-        if (currentUser.dating_preference === 'women' && u.gender !== 'woman') {
-          console.log('[Data] Skipping dating pref mismatch:', u.id, u.first_name, 'gender:', u.gender, 'my pref:', currentUser.dating_preference);
+      if (context === 'friends') {
+        if (u.wants_friends === false && u.wants_dating === true) {
           return false;
         }
       }
 
-      console.log('[Data] Including user:', u.id, u.first_name, 'in', context);
+      if (context === 'dating') {
+        if (u.wants_dating === false && u.wants_friends === true) {
+          return false;
+        }
+        if (currentUser.dating_preference === 'men' && u.gender !== 'man') {
+          return false;
+        }
+        if (currentUser.dating_preference === 'women' && u.gender !== 'woman') {
+          return false;
+        }
+      }
+
       return true;
     });
 

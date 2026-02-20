@@ -19,81 +19,77 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const [profileChecked, setProfileChecked] = useState<boolean>(false);
   const queryClient = useQueryClient();
 
-  const SAFE_COLUMNS = [
-    'id',
-    'phone_number',
-    'phone_verified',
-    'school_email',
-    'university',
-    'is_verified_esu',
-    'first_name',
-    'age',
-    'gender',
-    'pronouns',
-    'dating_preference',
-    'wants_friends',
-    'wants_dating',
-    'photo1_url',
-    'photo2_url',
-    'photo3_url',
-    'photo4_url',
-    'photo5_url',
-    'photo6_url',
-    'bio',
-    'major',
-    'class_year',
-    'interests',
-    'blocked_users',
-  ].join(',');
+  const mapRowToUser = useCallback((d: Record<string, any>, userId: string): User => {
+    const mode = d.mode ?? '';
+    const wantsFriends = d.wants_friends ?? (mode === 'friends' || mode === 'both') ?? false;
+    const wantsDating = d.wants_dating ?? (mode === 'dating' || mode === 'both') ?? false;
+    const datingPref = d.dating_preference ?? d.gender_preference ?? 'both';
+
+    return {
+      id: d.id ?? userId,
+      phone_number: d.phone_number ?? '',
+      phone_verified: d.phone_verified ?? false,
+      school_email: d.school_email ?? d.email ?? '',
+      password: '',
+      university: d.university ?? '',
+      is_verified_esu: d.is_verified_esu ?? d.verified ?? false,
+      first_name: d.first_name ?? d.name ?? '',
+      age: d.age ?? 0,
+      gender: d.gender ?? 'prefer not to say',
+      pronouns: d.pronouns ?? '',
+      dating_preference: datingPref,
+      wants_friends: wantsFriends,
+      wants_dating: wantsDating,
+      photo1_url: d.photo1_url ?? d.photo_url ?? d.avatar_url ?? '',
+      photo2_url: d.photo2_url ?? '',
+      photo3_url: d.photo3_url ?? '',
+      photo4_url: d.photo4_url ?? '',
+      photo5_url: d.photo5_url ?? '',
+      photo6_url: d.photo6_url ?? '',
+      bio: d.bio ?? '',
+      major: d.major ?? '',
+      class_year: d.class_year ?? '',
+      interests: d.interests ?? '',
+      blocked_users: d.blocked_users ?? [],
+      icebreaker_answers: d.icebreaker_answers ?? {},
+      personality_badges: d.personality_badges ?? [],
+    };
+  }, []);
 
   const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
     console.log('[Auth] Checking users table for user:', userId);
     try {
       const { data: rawData, error } = await supabase
         .from('users')
-        .select(SAFE_COLUMNS)
+        .select('*')
         .eq('id', userId)
         .single();
 
-      const data = rawData as Record<string, any> | null;
-
       if (error) {
-        console.log('[Auth] Profile lookup error:', error.message);
+        console.log('[Auth] Users table error:', error.message, '- trying profiles table');
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (profileError) {
+          console.log('[Auth] Profiles table error:', profileError.message);
+          return null;
+        }
+
+        if (profileData) {
+          const data = profileData as Record<string, any>;
+          console.log('[Auth] Profile found in profiles table, keys:', Object.keys(data));
+          return mapRowToUser(data, userId);
+        }
         return null;
       }
 
-      if (data) {
+      if (rawData) {
+        const data = rawData as Record<string, any>;
         console.log('[Auth] Profile found for user:', userId, 'keys:', Object.keys(data));
-        const profile: User = {
-          id: data.id ?? userId,
-          phone_number: data.phone_number ?? '',
-          phone_verified: data.phone_verified ?? false,
-          school_email: data.school_email ?? '',
-          password: '',
-          university: data.university ?? '',
-          is_verified_esu: data.is_verified_esu ?? false,
-          first_name: data.first_name ?? '',
-          age: data.age ?? 0,
-          gender: data.gender ?? 'prefer not to say',
-          pronouns: data.pronouns ?? '',
-          dating_preference: data.dating_preference ?? 'both',
-          wants_friends: data.wants_friends ?? false,
-          wants_dating: data.wants_dating ?? false,
-          photo1_url: data.photo1_url ?? '',
-          photo2_url: data.photo2_url ?? '',
-          photo3_url: data.photo3_url ?? '',
-          photo4_url: data.photo4_url ?? '',
-          photo5_url: data.photo5_url ?? '',
-          photo6_url: data.photo6_url ?? '',
-          bio: data.bio ?? '',
-          major: data.major ?? '',
-          class_year: data.class_year ?? '',
-          interests: data.interests ?? '',
-          blocked_users: data.blocked_users ?? [],
-          icebreaker_answers: {},
-          personality_badges: [],
-        };
-        return profile;
+        return mapRowToUser(data, userId);
       }
 
       console.log('[Auth] No profile found for user:', userId);
@@ -102,7 +98,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       console.log('[Auth] Profile fetch exception:', err);
       return null;
     }
-  }, []);
+  }, [mapRowToUser]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
