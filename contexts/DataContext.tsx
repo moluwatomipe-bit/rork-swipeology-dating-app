@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Swipe, Match, Message, User } from '@/types';
-import { MOCK_USERS } from '@/mocks/users';
 import { supabase } from '@/supabase';
 import { useAuth } from './AuthContext';
 import {
@@ -36,6 +35,45 @@ export const [DataProvider, useData] = createContextHook(() => {
   const [messages, setMessages] = useState<Map<string, Message[]>>(new Map());
   const [swipes, setSwipes] = useState<Swipe[]>([]);
   const [supabaseUsers, setSupabaseUsers] = useState<User[]>([]);
+
+  /* -------------------------------------------------------
+     FETCH EXISTING SWIPES FROM SUPABASE
+  ------------------------------------------------------- */
+  const swipesQuery = useQuery({
+    queryKey: ['swipes', currentUser?.id],
+    enabled: !!currentUser,
+    queryFn: async () => {
+      if (!currentUser) return [];
+      console.log('[Data] Fetching existing swipes from Supabase for:', currentUser.id);
+      const { data, error } = await supabase
+        .from('swipes')
+        .select('*')
+        .eq('user_from', currentUser.id);
+
+      if (error) {
+        console.log('[Data] Fetch swipes error:', error.message);
+        return [];
+      }
+
+      console.log('[Data] Fetched existing swipes:', data?.length ?? 0);
+      return (data ?? []).map((d: any): Swipe => ({
+        id: d.id ?? `swipe_${d.user_from}_${d.user_to}`,
+        user_from: d.user_from,
+        user_to: d.user_to,
+        context: d.context,
+        liked: d.liked,
+        created_at: d.created_at ?? new Date().toISOString(),
+      }));
+    },
+    staleTime: 60000,
+  });
+
+  useEffect(() => {
+    if (swipesQuery.data) {
+      setSwipes(swipesQuery.data);
+      console.log('[Data] Swipes loaded from Supabase:', swipesQuery.data.length);
+    }
+  }, [swipesQuery.data]);
 
   /* -------------------------------------------------------
      FETCH ALL USERS FROM SUPABASE
@@ -314,12 +352,12 @@ export const [DataProvider, useData] = createContextHook(() => {
           const otherId = m.user1 === currentUser.id ? m.user2 : m.user1;
           if (blockedIds.includes(otherId)) return null;
 
-          const otherUser = MOCK_USERS.find((u) => u.id === otherId);
+          const otherUser = supabaseUsers.find((u) => u.id === otherId);
           return otherUser ? { ...m, otherUser } : null;
         })
         .filter(Boolean) as (Match & { otherUser: User })[];
     },
-    [currentUser, matches]
+    [currentUser, matches, supabaseUsers]
   );
 
   const getMessagesForMatch = useCallback(
@@ -337,9 +375,9 @@ export const [DataProvider, useData] = createContextHook(() => {
       if (!match) return null;
 
       const otherId = match.user1 === currentUser.id ? match.user2 : match.user1;
-      return MOCK_USERS.find((u) => u.id === otherId) || null;
+      return supabaseUsers.find((u) => u.id === otherId) || null;
     },
-    [currentUser, matches]
+    [currentUser, matches, supabaseUsers]
   );
 
   /* -------------------------------------------------------
@@ -365,14 +403,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     [persistMessages]
   );
 const getAllAvailableUsers = useCallback((): User[] => {
-  const userMap = new Map<string, User>();
-  for (const u of MOCK_USERS) {
-    userMap.set(u.id, u);
-  }
-  for (const u of supabaseUsers) {
-    userMap.set(u.id, u);
-  }
-  return Array.from(userMap.values());
+  return supabaseUsers;
 }, [supabaseUsers]);
 
 const getFilteredUsers = useCallback(
@@ -425,6 +456,8 @@ const getFilteredUsers = useCallback(
   [currentUser, swipes, getAllAvailableUsers]
 );
 
+  const isUsersLoading = allUsersQuery.isLoading || swipesQuery.isLoading;
+
   return {
     swipes,
     matches,
@@ -437,5 +470,6 @@ const getFilteredUsers = useCallback(
     removeMatch,
     loadMessagesForMatch,
     getFilteredUsers,
+    isUsersLoading,
   };
 });

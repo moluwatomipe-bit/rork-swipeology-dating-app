@@ -40,7 +40,7 @@ const theme = Colors.dark;
 export default function SwipeScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser } = useAuth();
-  const { getFilteredUsers, performSwipe } = useData();
+  const { getFilteredUsers, performSwipe, isUsersLoading } = useData();
   const [activeTab, setActiveTab] = useState<'friends' | 'dating'>('friends');
   const [cardIndex, setCardIndex] = useState<number>(0);
   const [matchPopup, setMatchPopup] = useState<{ match: Match; user: User } | null>(null);
@@ -490,7 +490,17 @@ export default function SwipeScreen() {
       </View>
 
       <View style={styles.deckContainer}>
-        {!currentCard ? (
+        {isUsersLoading ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Sparkles size={48} color={theme.textMuted} />
+            </View>
+            <Text style={styles.emptyTitle}>Loading profiles...</Text>
+            <Text style={styles.emptySubtitle}>
+              Fetching real students from your campus
+            </Text>
+          </View>
+        ) : !currentCard ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
               {activeTab === 'friends' ? (
