@@ -72,7 +72,7 @@ function resolveWantsFlags(d: Record<string, any>): { wantsFriends: boolean; wan
 }
 
 export const [DataProvider, useData] = createContextHook(() => {
-  const { currentUser } = useAuth();
+  const { currentUser, session } = useAuth();
   const queryClient = useQueryClient();
 
   const [matches, setMatches] = useState<Map<string, Match>>(new Map());
@@ -81,9 +81,11 @@ export const [DataProvider, useData] = createContextHook(() => {
   const [supabaseUsers, setSupabaseUsers] = useState<User[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const isSessionReady = !!session?.user?.id && !!currentUser?.id;
+
   const swipesQuery = useQuery({
     queryKey: ['swipes', currentUser?.id],
-    enabled: !!currentUser?.id,
+    enabled: isSessionReady,
     queryFn: async () => {
       if (!currentUser) return [];
       console.log('[Data] Fetching swipes for:', currentUser.id);
@@ -157,26 +159,34 @@ export const [DataProvider, useData] = createContextHook(() => {
   };
 
   const allUsersQuery = useQuery({
-    queryKey: ['all-users'],
-    enabled: !!currentUser?.id,
+    queryKey: ['all-users', session?.user?.id],
+    enabled: isSessionReady,
     queryFn: async () => {
       console.log('[Data] ===== FETCHING ALL USERS FROM SUPABASE =====');
+      console.log('[Data] Session user:', session?.user?.id);
+      console.log('[Data] Session access_token present:', !!session?.access_token);
       setFetchError(null);
 
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from('users')
         .select('*');
 
+      console.log('[Data] Users query status:', status);
+
       if (error) {
-        console.log('[Data] Users table error:', error.message);
+        console.log('[Data] Users table error:', error.message, 'code:', error.code, 'status:', status);
+
         console.log('[Data] Trying profiles table as fallback...');
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData, error: profileError, status: profileStatus } = await supabase
           .from('profiles')
           .select('*');
 
+        console.log('[Data] Profiles query status:', profileStatus);
+
         if (profileError) {
           console.log('[Data] Profiles table also failed:', profileError.message);
-          setFetchError(`Users: ${error.message} | Profiles: ${profileError.message}`);
+          const errMsg = `Could not load users. Users table: ${error.message}. Profiles table: ${profileError.message}. This is likely a Row Level Security (RLS) issue — add a SELECT policy for authenticated users.`;
+          setFetchError(errMsg);
           return [];
         }
 
@@ -190,13 +200,17 @@ export const [DataProvider, useData] = createContextHook(() => {
 
       const rows = (data ?? []) as Record<string, any>[];
       console.log('[Data] Fetched users count:', rows.length);
-      if (rows.length > 0) {
-        console.log('[Data] Sample user keys:', Object.keys(rows[0]));
+
+      if (rows.length === 0) {
+        console.log('[Data] WARNING: 0 rows returned. Possible causes:');
+        console.log('[Data]   1. No users in the table');
+        console.log('[Data]   2. RLS policy blocking reads — add: CREATE POLICY "Allow authenticated read" ON users FOR SELECT TO authenticated USING (true)');
+        console.log('[Data]   3. Wrong table name');
+        setFetchError('No users found. If users exist, check that the "users" table has an RLS SELECT policy allowing authenticated users to read all rows.');
+      } else {
         rows.forEach((r, i) => {
           console.log(`[Data] DB Row[${i}]: id=${r.id}, name=${r.first_name ?? r.name}, gender=${r.gender}, mode=${r.mode ?? r.intent}, wf=${r.wants_friends}, wd=${r.wants_dating}, pref=${r.dating_preference ?? r.gender_preference}`);
         });
-      } else {
-        console.log('[Data] WARNING: 0 rows returned from users table');
       }
 
       return rows.map(mapRowToUser);
@@ -205,6 +219,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     refetchOnMount: 'always' as const,
     refetchInterval: 30000,
     retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   });
 
   useEffect(() => {
@@ -216,7 +231,7 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const matchesQuery = useQuery({
     queryKey: ['matches', currentUser?.id],
-    enabled: !!currentUser?.id,
+    enabled: isSessionReady,
     queryFn: async () => {
       if (!currentUser) return [];
       return fetchMatchesForUser(currentUser.id);
@@ -426,12 +441,16 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const refreshUsers = useCallback(async () => {
     console.log('[Data] ===== MANUAL REFRESH TRIGGERED =====');
-    queryClient.removeQueries({ queryKey: ['all-users'] });
-    queryClient.removeQueries({ queryKey: ['swipes', currentUser?.id] });
-    await queryClient.refetchQueries({ queryKey: ['all-users'] });
+    console.log('[Data] Session ready:', isSessionReady);
+    setFetchError(null);
+    await queryClient.invalidateQueries({ queryKey: ['all-users'] });
+    await queryClient.invalidateQueries({ queryKey: ['swipes', currentUser?.id] });
+    await queryClient.invalidateQueries({ queryKey: ['matches', currentUser?.id] });
+    await queryClient.refetchQueries({ queryKey: ['all-users', session?.user?.id] });
     await queryClient.refetchQueries({ queryKey: ['swipes', currentUser?.id] });
+    await queryClient.refetchQueries({ queryKey: ['matches', currentUser?.id] });
     console.log('[Data] ===== REFRESH COMPLETE =====');
-  }, [queryClient, currentUser?.id]);
+  }, [queryClient, currentUser?.id, session?.user?.id, isSessionReady]);
 
   const getFilteredUsers = useCallback(
     (context: 'friends' | 'dating'): User[] => {
@@ -442,7 +461,11 @@ export const [DataProvider, useData] = createContextHook(() => {
 
       const blockedIds = currentUser.blocked_users || [];
 
-      console.log('[Data] getFilteredUsers:', context, '| total supabaseUsers:', supabaseUsers.length, '| currentUser:', currentUser.id, '| name:', currentUser.first_name);
+      console.log('[Data] getFilteredUsers:', context);
+      console.log('[Data]   total supabaseUsers:', supabaseUsers.length);
+      console.log('[Data]   currentUser:', currentUser.id, currentUser.first_name);
+      console.log('[Data]   currentUser wants_friends:', currentUser.wants_friends, 'wants_dating:', currentUser.wants_dating);
+      console.log('[Data]   currentUser gender:', currentUser.gender, 'dating_preference:', currentUser.dating_preference);
 
       const swipedUserIds = new Set(
         swipes
@@ -450,28 +473,37 @@ export const [DataProvider, useData] = createContextHook(() => {
           .map((s) => s.user_to)
       );
 
-      console.log('[Data] Already swiped in', context, ':', swipedUserIds.size);
+      console.log('[Data]   Already swiped in', context, ':', swipedUserIds.size);
 
       const filtered = supabaseUsers.filter((u) => {
         if (u.id === currentUser.id) {
+          console.log(`[Data]   SKIP ${u.first_name}: is self`);
           return false;
         }
 
         if (swipedUserIds.has(u.id)) {
+          console.log(`[Data]   SKIP ${u.first_name}: already swiped`);
           return false;
         }
 
         if (blockedIds.includes(u.id)) {
+          console.log(`[Data]   SKIP ${u.first_name}: blocked by me`);
           return false;
         }
 
         if ((u.blocked_users || []).includes(currentUser.id)) {
+          console.log(`[Data]   SKIP ${u.first_name}: blocked me`);
           return false;
         }
 
         if (context === 'dating') {
-          if (u.wants_dating === false && u.wants_friends === true) {
-            console.log(`[Data] Skip ${u.first_name} from dating: wants friends only`);
+          if (!u.wants_dating) {
+            console.log(`[Data]   SKIP ${u.first_name}: does not want dating (wants_dating=${u.wants_dating})`);
+            return false;
+          }
+
+          if (!currentUser.wants_dating) {
+            console.log(`[Data]   SKIP dating tab: current user does not want dating`);
             return false;
           }
 
@@ -480,22 +512,35 @@ export const [DataProvider, useData] = createContextHook(() => {
           const theirPref = normalizeDatingPref(u.dating_preference);
           const myGender = normalizeGender(currentUser.gender);
 
+          console.log(`[Data]   Dating check for ${u.first_name}: myPref=${myPref}, theirGender=${theirGender}, theirPref=${theirPref}, myGender=${myGender}`);
+
           if (myPref === 'men' && theirGender !== 'man') {
+            console.log(`[Data]   SKIP ${u.first_name}: I want men, they are ${theirGender}`);
             return false;
           }
           if (myPref === 'women' && theirGender !== 'woman') {
+            console.log(`[Data]   SKIP ${u.first_name}: I want women, they are ${theirGender}`);
             return false;
           }
 
           if (theirPref === 'men' && myGender !== 'man') {
+            console.log(`[Data]   SKIP ${u.first_name}: they want men, I am ${myGender}`);
             return false;
           }
           if (theirPref === 'women' && myGender !== 'woman') {
+            console.log(`[Data]   SKIP ${u.first_name}: they want women, I am ${myGender}`);
             return false;
           }
         }
 
-        console.log(`[Data] INCLUDE ${u.first_name || u.id} in ${context}`);
+        if (context === 'friends') {
+          if (!u.wants_friends) {
+            console.log(`[Data]   SKIP ${u.first_name}: does not want friends (wants_friends=${u.wants_friends})`);
+            return false;
+          }
+        }
+
+        console.log(`[Data]   INCLUDE ${u.first_name || u.id} in ${context}`);
         return true;
       });
 

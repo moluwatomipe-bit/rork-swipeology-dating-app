@@ -538,13 +538,15 @@ export default function SwipeScreen() {
             </Text>
             <Text style={styles.emptySubtitle}>
               {fetchError
-                ? `Error loading users: ${fetchError}`
-                : totalSupabaseUsers <= 1
-                  ? 'No other users have signed up yet. Check back soon!'
-                  : `Check back later for new ${activeTab === 'friends' ? 'friends' : 'matches'}`}
+                ? fetchError
+                : totalSupabaseUsers === 0
+                  ? 'No users found. If users exist in the database, the "users" table may need a Row Level Security (RLS) SELECT policy for authenticated users.'
+                  : totalSupabaseUsers <= 1
+                    ? 'No other users have signed up yet. Check back soon!'
+                    : `All ${activeTab === 'friends' ? 'friend' : 'dating'} profiles have been viewed. Pull to refresh for new ones!`}
             </Text>
             <Text style={styles.debugText}>
-              {`DB users: ${totalSupabaseUsers} | Tab: ${activeTab}`}
+              {`DB users: ${totalSupabaseUsers} | Tab: ${activeTab} | Filtered: ${users.length}`}
             </Text>
             <TouchableOpacity
               style={[styles.refreshBtn, isManualRefreshing && { opacity: 0.6 }]}
