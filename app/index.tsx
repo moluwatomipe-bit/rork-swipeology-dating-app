@@ -4,10 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import Colors from "@/constants/colors";
 
 export default function Index() {
-  const { user, profile, loading } = useAuth();
+  const { currentUser, session, isReady, hasProfile } = useAuth();
 
-  // Still loading auth → show spinner, don't navigate yet
-  if (loading) {
+  if (!isReady) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={Colors.dark.primary} />
@@ -15,18 +14,15 @@ export default function Index() {
     );
   }
 
-  // No user → go to onboarding / auth flow
-  if (!user) {
-    return <Redirect href="/onboarding" />;
+  if (!session) {
+    return <Redirect href={"/onboarding" as any} />;
   }
 
-  // User but no profile → onboarding
-  if (user && !profile) {
-    return <Redirect href="/onboarding" />;
+  if (session && !hasProfile) {
+    return <Redirect href={"/onboarding" as any} />;
   }
 
-  // User + profile → main app
-  return <Redirect href="/(tabs)/swipe" />;
+  return <Redirect href={"/(tabs)/swipe" as any} />;
 }
 
 const styles = StyleSheet.create({
