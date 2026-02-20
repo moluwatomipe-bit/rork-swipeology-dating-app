@@ -10,6 +10,58 @@ const STORAGE_KEY_USER = '@swipeology_user';
 const STORAGE_KEY_ONBOARDING = '@swipeology_onboarding';
 const STORAGE_KEY_REPORTS = '@swipeology_reports';
 
+function normalizeGender(raw: any): string {
+  const val = (raw ?? '').toString().toLowerCase().trim();
+  if (val === 'male' || val === 'man' || val === 'm') return 'man';
+  if (val === 'female' || val === 'woman' || val === 'f') return 'woman';
+  if (val === 'non-binary' || val === 'nonbinary' || val === 'nb') return 'non-binary';
+  return val || 'prefer not to say';
+}
+
+function normalizeDatingPref(raw: any): string {
+  const val = (raw ?? '').toString().toLowerCase().trim();
+  if (val === 'male' || val === 'men' || val === 'man' || val === 'm') return 'men';
+  if (val === 'female' || val === 'women' || val === 'woman' || val === 'f') return 'women';
+  if (val === 'everyone' || val === 'all' || val === 'both' || val === 'no preference' || val === '') return 'both';
+  return val || 'both';
+}
+
+function resolveWantsFlags(d: Record<string, any>): { wantsFriends: boolean; wantsDating: boolean } {
+  const mode = (d.mode ?? d.intent ?? '').toString().toLowerCase().trim();
+  const rawFriends = d.wants_friends;
+  const rawDating = d.wants_dating;
+
+  let wantsFriends: boolean;
+  let wantsDating: boolean;
+
+  if (rawFriends === true || rawFriends === 'true' || rawFriends === 1) {
+    wantsFriends = true;
+  } else if (rawFriends === false || rawFriends === 'false' || rawFriends === 0) {
+    wantsFriends = false;
+  } else if (mode) {
+    wantsFriends = mode === 'friends' || mode === 'both';
+  } else {
+    wantsFriends = true;
+  }
+
+  if (rawDating === true || rawDating === 'true' || rawDating === 1) {
+    wantsDating = true;
+  } else if (rawDating === false || rawDating === 'false' || rawDating === 0) {
+    wantsDating = false;
+  } else if (mode) {
+    wantsDating = mode === 'dating' || mode === 'both';
+  } else {
+    wantsDating = true;
+  }
+
+  if (!wantsFriends && !wantsDating) {
+    wantsFriends = true;
+    wantsDating = true;
+  }
+
+  return { wantsFriends, wantsDating };
+}
+
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -20,20 +72,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
 
   const mapRowToUser = useCallback((d: Record<string, any>, userId: string): User => {
-    const mode = (d.mode ?? '').toString().toLowerCase();
-    const rawFriends = d.wants_friends;
-    const rawDating = d.wants_dating;
-    const wantsFriends = rawFriends === true || rawFriends === 'true' || rawFriends === 1
-      ? true
-      : (rawFriends === false || rawFriends === 'false' || rawFriends === 0)
-        ? false
-        : (mode === 'friends' || mode === 'both' || (!mode && rawFriends == null));
-    const wantsDating = rawDating === true || rawDating === 'true' || rawDating === 1
-      ? true
-      : (rawDating === false || rawDating === 'false' || rawDating === 0)
-        ? false
-        : (mode === 'dating' || mode === 'both' || (!mode && rawDating == null));
-    const datingPref = d.dating_preference ?? d.gender_preference ?? 'both';
+    const { wantsFriends, wantsDating } = resolveWantsFlags(d);
+    const gender = normalizeGender(d.gender);
+    const datingPref = normalizeDatingPref(d.dating_preference ?? d.gender_preference);
+
+    console.log(`[Auth] mapRowToUser: id=${d.id ?? userId}, name=${d.first_name ?? d.name}, gender=${gender}, pref=${datingPref}, wF=${wantsFriends}, wD=${wantsDating}`);
 
     return {
       id: d.id ?? userId,
@@ -45,9 +88,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       is_verified_esu: d.is_verified_esu ?? d.verified ?? false,
       first_name: d.first_name ?? d.name ?? '',
       age: d.age ?? 0,
-      gender: d.gender ?? 'prefer not to say',
+      gender: gender as User['gender'],
       pronouns: d.pronouns ?? '',
-      dating_preference: datingPref,
+      dating_preference: datingPref as User['dating_preference'],
       wants_friends: wantsFriends,
       wants_dating: wantsDating,
       photo1_url: d.photo1_url ?? d.photo_url ?? d.avatar_url ?? '',
@@ -60,9 +103,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       major: d.major ?? '',
       class_year: d.class_year ?? '',
       interests: d.interests ?? '',
-      blocked_users: d.blocked_users ?? [],
-      icebreaker_answers: d.icebreaker_answers ?? {},
-      personality_badges: d.personality_badges ?? [],
+      blocked_users: Array.isArray(d.blocked_users) ? d.blocked_users : [],
+      icebreaker_answers: (d.icebreaker_answers && typeof d.icebreaker_answers === 'object') ? d.icebreaker_answers : {},
+      personality_badges: Array.isArray(d.personality_badges) ? d.personality_badges : [],
     };
   }, []);
 

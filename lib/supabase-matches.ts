@@ -11,22 +11,28 @@ export async function createMatch(
 ): Promise<Match | null> {
   console.log('[Supabase] Creating match:', user1, user2, context);
 
-  // 1. Check if match already exists (in either direction)
-  const { data: existing, error: existingError } = await supabase
+  const { data: existingAll, error: existingError } = await supabase
     .from('matches')
     .select('*')
     .or(
       `and(user1.eq.${user1},user2.eq.${user2}),and(user1.eq.${user2},user2.eq.${user1})`
-    )
-    .eq('context', context)
-    .maybeSingle();
+    );
 
-  if (existing) {
-    console.log('[Supabase] Match already exists:', existing.id);
-    return existing as Match;
+  if (existingError) {
+    console.log('[Supabase] Check existing matches error:', existingError.message);
   }
 
-  // 2. Create a new match
+  if (existingAll && existingAll.length > 0) {
+    const exactMatch = existingAll.find((m: any) => m.context === context);
+    if (exactMatch) {
+      console.log('[Supabase] Match already exists with same context:', exactMatch.id);
+      return exactMatch as Match;
+    }
+    const anyMatch = existingAll[0];
+    console.log('[Supabase] Match already exists with different context:', anyMatch.id, 'context:', anyMatch.context);
+    return anyMatch as Match;
+  }
+
   const { data, error } = await supabase
     .from('matches')
     .insert({
@@ -168,23 +174,38 @@ export async function checkMutualSwipe(
   userTo: string,
   context: 'friends' | 'dating'
 ): Promise<boolean> {
-  console.log('[Supabase] Checking mutual swipe:', userTo, '->', userFrom);
+  console.log('[Supabase] Checking mutual swipe:', userTo, '->', userFrom, 'context:', context);
 
   const { data, error } = await supabase
     .from('swipes')
-    .select('id')
+    .select('id, context')
     .eq('user_from', userTo)
     .eq('user_to', userFrom)
-    .eq('context', context)
-    .eq('liked', true)
-    .limit(1);
+    .eq('liked', true);
 
   if (error) {
     console.log('[Supabase] Check mutual swipe error:', error.message);
     return false;
   }
 
-  return (data?.length ?? 0) > 0;
+  if (!data || data.length === 0) {
+    console.log('[Supabase] No mutual swipe found');
+    return false;
+  }
+
+  const exactMatch = data.some((s: any) => s.context === context);
+  if (exactMatch) {
+    console.log('[Supabase] Exact context mutual swipe found!');
+    return true;
+  }
+
+  const anyLike = data.length > 0;
+  if (anyLike) {
+    console.log('[Supabase] Cross-context mutual like found (they liked in:', data.map((s: any) => s.context).join(','), '). Treating as mutual match.');
+    return true;
+  }
+
+  return false;
 }
 
 /* -------------------------------------------------------
