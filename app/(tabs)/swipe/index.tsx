@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -65,6 +65,14 @@ export default function SwipeScreen() {
   });
 
   const users = useMemo(() => getFilteredUsers(activeTab), [activeTab, getFilteredUsers]);
+
+  useEffect(() => {
+    if (cardIndex > 0 && cardIndex >= users.length) {
+      console.log('[Swipe] cardIndex out of bounds, resetting to 0');
+      setCardIndex(0);
+    }
+  }, [users.length, cardIndex]);
+
   const currentCard = users[cardIndex] || null;
   const nextCard = users[cardIndex + 1] || null;
 

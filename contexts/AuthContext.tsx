@@ -271,7 +271,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         'dating_preference', 'wants_friends', 'wants_dating',
         'photo1_url', 'photo2_url', 'photo3_url', 'photo4_url',
         'photo5_url', 'photo6_url', 'bio', 'major', 'class_year',
-        'interests', 'blocked_users',
+        'interests', 'blocked_users', 'icebreaker_answers', 'personality_badges',
       ]);
       const syncData: Record<string, unknown> = {};
       for (const key of Object.keys(updates)) {

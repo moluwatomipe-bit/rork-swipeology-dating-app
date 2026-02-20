@@ -75,10 +75,7 @@ export const [DataProvider, useData] = createContextHook(() => {
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
 
-  // TEMPORARY CLEANUP — run once to remove old message format
-  useEffect(() => {
-    AsyncStorage.removeItem('@swipeology_messages');
-  }, []);
+
 
   /* -------------------------------------------------------
      INTERNAL STATE (Maps)
@@ -210,8 +207,10 @@ export const [DataProvider, useData] = createContextHook(() => {
 
       return rows.map(mapRowToUser);
     },
-    staleTime: 30000,
+    staleTime: 15000,
     refetchOnMount: 'always' as const,
+    refetchInterval: 60000,
+    retry: 3,
   });
 
   useEffect(() => {
@@ -503,7 +502,9 @@ export const [DataProvider, useData] = createContextHook(() => {
 const refreshUsers = useCallback(async () => {
   console.log('[Data] Manual refresh triggered');
   await queryClient.invalidateQueries({ queryKey: ['all-users'] });
+  await queryClient.refetchQueries({ queryKey: ['all-users'] });
   await queryClient.invalidateQueries({ queryKey: ['swipes', currentUser?.id] });
+  await queryClient.refetchQueries({ queryKey: ['swipes', currentUser?.id] });
 }, [queryClient, currentUser?.id]);
 
 const getAllAvailableUsers = useCallback((): User[] => {
@@ -555,15 +556,15 @@ const getFilteredUsers = useCallback(
       }
 
       if (context === 'friends') {
-        if (u.wants_friends === false && u.wants_dating === true) {
-          console.log(`[Data] Filtering out ${u.first_name}: dating only (wF=${u.wants_friends}, wD=${u.wants_dating})`);
+        if (u.wants_friends === false) {
+          console.log(`[Data] Filtering out ${u.first_name}: does not want friends (wF=${u.wants_friends}, wD=${u.wants_dating})`);
           return false;
         }
       }
 
       if (context === 'dating') {
-        if (u.wants_dating === false && u.wants_friends === true) {
-          console.log(`[Data] Filtering out ${u.first_name}: friends only (wD=${u.wants_dating}, wF=${u.wants_friends})`);
+        if (u.wants_dating === false) {
+          console.log(`[Data] Filtering out ${u.first_name}: does not want dating (wD=${u.wants_dating}, wF=${u.wants_friends})`);
           return false;
         }
 

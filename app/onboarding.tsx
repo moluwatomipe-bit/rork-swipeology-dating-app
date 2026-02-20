@@ -1458,7 +1458,7 @@ export default function OnboardingScreen() {
 
             console.log('[Onboarding] Upserting profile with id:', userId);
 
-            const profileData = {
+            const coreProfileData = {
               id: userId,
               phone_number: phoneNumber.trim() || '',
               phone_verified: false,
@@ -1484,15 +1484,30 @@ export default function OnboardingScreen() {
               interests: interests.trim(),
             };
 
-            const { error: upsertError } = await supabase
-              .from('users')
-              .upsert(profileData, { onConflict: 'id' });
+            const fullProfileData = {
+              ...coreProfileData,
+              icebreaker_answers: icebreakerAnswers,
+              personality_badges: selectedBadges,
+            };
 
-            if (upsertError) {
-              console.log('[Onboarding] Upsert error:', upsertError.message);
-              setError(upsertError.message);
-              setIsSubmitting(false);
-              return;
+            console.log('[Onboarding] Trying full upsert with icebreaker data...');
+            const { error: fullUpsertError } = await supabase
+              .from('users')
+              .upsert(fullProfileData, { onConflict: 'id' });
+
+            if (fullUpsertError) {
+              console.log('[Onboarding] Full upsert failed:', fullUpsertError.message, '- trying without optional columns...');
+              const { error: coreUpsertError } = await supabase
+                .from('users')
+                .upsert(coreProfileData, { onConflict: 'id' });
+
+              if (coreUpsertError) {
+                console.log('[Onboarding] Core upsert also failed:', coreUpsertError.message);
+                setError(coreUpsertError.message);
+                setIsSubmitting(false);
+                return;
+              }
+              console.log('[Onboarding] Core profile saved (without icebreaker columns)');
             }
 
             console.log('[Onboarding] Profile saved to Supabase successfully');
@@ -1500,7 +1515,7 @@ export default function OnboardingScreen() {
             await refreshProfile();
 
             const localUser = {
-              ...profileData,
+              ...coreProfileData,
               password: '',
               blocked_users: [] as string[],
               icebreaker_answers: icebreakerAnswers,
