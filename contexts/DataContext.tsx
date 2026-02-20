@@ -81,9 +81,19 @@ export const [DataProvider, useData] = createContextHook(() => {
      would silently return zero rows.
   ------------------------------------------------------- */
   const mapRowToUser = (d: Record<string, any>): User => {
-    const mode = d.mode ?? '';
-    const wantsFriends = d.wants_friends ?? (mode === 'friends' || mode === 'both') ?? false;
-    const wantsDating = d.wants_dating ?? (mode === 'dating' || mode === 'both') ?? false;
+    const mode = (d.mode ?? '').toString().toLowerCase();
+    const rawFriends = d.wants_friends;
+    const rawDating = d.wants_dating;
+    const wantsFriends = rawFriends === true || rawFriends === 'true' || rawFriends === 1
+      ? true
+      : (rawFriends === false || rawFriends === 'false' || rawFriends === 0)
+        ? false
+        : (mode === 'friends' || mode === 'both' || (!mode && rawFriends == null));
+    const wantsDating = rawDating === true || rawDating === 'true' || rawDating === 1
+      ? true
+      : (rawDating === false || rawDating === 'false' || rawDating === 0)
+        ? false
+        : (mode === 'dating' || mode === 'both' || (!mode && rawDating == null));
     const datingPref = d.dating_preference ?? d.gender_preference ?? 'both';
 
     return {
@@ -500,19 +510,25 @@ const getFilteredUsers = useCallback(
       }
 
       if (context === 'friends') {
-        if (u.wants_friends === false && u.wants_dating === true) {
+        if (u.wants_friends !== true && u.wants_dating === true) {
+          console.log(`[Data] Filtering out ${u.first_name}: wants_friends=${u.wants_friends}, wants_dating=${u.wants_dating} (dating only)`);
           return false;
         }
       }
 
       if (context === 'dating') {
-        if (u.wants_dating === false && u.wants_friends === true) {
+        if (u.wants_dating !== true && u.wants_friends === true) {
+          console.log(`[Data] Filtering out ${u.first_name}: wants_dating=${u.wants_dating}, wants_friends=${u.wants_friends} (friends only)`);
           return false;
         }
-        if (currentUser.dating_preference === 'men' && u.gender !== 'man') {
+        const myPref = (currentUser.dating_preference ?? 'both').toString().toLowerCase();
+        const theirGender = (u.gender ?? '').toString().toLowerCase();
+        if (myPref === 'men' && theirGender !== 'man') {
+          console.log(`[Data] Filtering out ${u.first_name}: pref=${myPref}, gender=${theirGender}`);
           return false;
         }
-        if (currentUser.dating_preference === 'women' && u.gender !== 'woman') {
+        if (myPref === 'women' && theirGender !== 'woman') {
+          console.log(`[Data] Filtering out ${u.first_name}: pref=${myPref}, gender=${theirGender}`);
           return false;
         }
       }

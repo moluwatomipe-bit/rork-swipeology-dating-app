@@ -20,9 +20,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
 
   const mapRowToUser = useCallback((d: Record<string, any>, userId: string): User => {
-    const mode = d.mode ?? '';
-    const wantsFriends = d.wants_friends ?? (mode === 'friends' || mode === 'both') ?? false;
-    const wantsDating = d.wants_dating ?? (mode === 'dating' || mode === 'both') ?? false;
+    const mode = (d.mode ?? '').toString().toLowerCase();
+    const rawFriends = d.wants_friends;
+    const rawDating = d.wants_dating;
+    const wantsFriends = rawFriends === true || rawFriends === 'true' || rawFriends === 1
+      ? true
+      : (rawFriends === false || rawFriends === 'false' || rawFriends === 0)
+        ? false
+        : (mode === 'friends' || mode === 'both' || (!mode && rawFriends == null));
+    const wantsDating = rawDating === true || rawDating === 'true' || rawDating === 1
+      ? true
+      : (rawDating === false || rawDating === 'false' || rawDating === 0)
+        ? false
+        : (mode === 'dating' || mode === 'both' || (!mode && rawDating == null));
     const datingPref = d.dating_preference ?? d.gender_preference ?? 'both';
 
     return {
