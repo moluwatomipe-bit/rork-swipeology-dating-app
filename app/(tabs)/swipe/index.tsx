@@ -571,22 +571,45 @@ export default function SwipeScreen() {
         onRequestClose={() => setMatchPopup(null)}
       >
         <View style={styles.matchOverlay}>
-          <View style={styles.matchPopup}>
-            <LinearGradient
-              colors={activeTab === 'friends' ? ['#EC4899', '#F472B6'] : ['#A855F7', '#D946EF']}
-              style={styles.matchGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Sparkles size={40} color="#fff" />
-              <Text style={styles.matchTitle}>It&apos;s a match!</Text>
+          <LinearGradient
+            colors={activeTab === 'friends' ? ['#0F172A', '#1E1B4B', '#312E81'] : ['#0F172A', '#3B0764', '#581C87']}
+            style={styles.matchFullGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.matchContent}>
+              <Sparkles size={32} color="#F59E0B" />
+              <Text style={styles.matchTitle}>It&apos;s a Match!</Text>
               <Text style={styles.matchSubtext}>
                 {activeTab === 'friends'
                   ? `You and ${matchPopup?.user.first_name} want to be friends!`
                   : `You and ${matchPopup?.user.first_name} like each other!`}
               </Text>
+
+              <View style={styles.matchPhotosRow}>
+                <View style={styles.matchPhotoWrapper}>
+                  <Image
+                    source={{ uri: currentUser?.photo1_url }}
+                    style={styles.matchPhoto}
+                    contentFit="cover"
+                  />
+                  <View style={[styles.matchPhotoRing, { borderColor: activeTab === 'friends' ? '#EC4899' : '#A855F7' }]} />
+                </View>
+                <View style={styles.matchHeartBridge}>
+                  <Heart size={28} color={activeTab === 'friends' ? '#EC4899' : '#A855F7'} fill={activeTab === 'friends' ? '#EC4899' : '#A855F7'} />
+                </View>
+                <View style={styles.matchPhotoWrapper}>
+                  <Image
+                    source={{ uri: matchPopup?.user.photo1_url }}
+                    style={styles.matchPhoto}
+                    contentFit="cover"
+                  />
+                  <View style={[styles.matchPhotoRing, { borderColor: activeTab === 'friends' ? '#EC4899' : '#A855F7' }]} />
+                </View>
+              </View>
+
               <TouchableOpacity
-                style={styles.matchChatBtn}
+                style={[styles.matchChatBtn, { backgroundColor: activeTab === 'friends' ? '#EC4899' : '#A855F7' }]}
                 onPress={() => {
                   const m = matchPopup;
                   setMatchPopup(null);
@@ -602,17 +625,19 @@ export default function SwipeScreen() {
                   }
                 }}
                 activeOpacity={0.8}
+                testID="match-chat-btn"
               >
-                <Text style={styles.matchChatBtnText}>Go to Chat</Text>
+                <Text style={styles.matchChatBtnText}>Start Chatting</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setMatchPopup(null)}
                 activeOpacity={0.7}
+                style={styles.matchKeepBtn}
               >
-                <Text style={styles.matchKeepText}>Keep swiping</Text>
+                <Text style={styles.matchKeepText}>Keep Swiping</Text>
               </TouchableOpacity>
-            </LinearGradient>
-          </View>
+            </View>
+          </LinearGradient>
         </View>
       </Modal>
     </View>
@@ -902,49 +927,88 @@ const styles = StyleSheet.create({
   },
   matchOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  matchFullGradient: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
   },
-  matchPopup: {
-    width: '100%',
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  matchGradient: {
-    padding: 40,
+  matchContent: {
     alignItems: 'center',
-    gap: 12,
+    paddingHorizontal: 32,
+    gap: 10,
+  },
+  matchPhotosRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 24,
+    gap: 0,
+  },
+  matchPhotoWrapper: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    position: 'relative' as const,
+  },
+  matchPhoto: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  matchPhotoRing: {
+    position: 'absolute' as const,
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 63,
+    borderWidth: 3,
+  },
+  matchHeartBridge: {
+    marginHorizontal: -8,
+    zIndex: 10,
+    backgroundColor: 'rgba(15,23,42,0.8)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   matchTitle: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '800' as const,
     color: '#fff',
-    marginTop: 8,
+    marginTop: 4,
+    letterSpacing: -0.5,
   },
   matchSubtext: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    marginBottom: 8,
+    lineHeight: 22,
   },
   matchChatBtn: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 24,
-    marginTop: 8,
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+    borderRadius: 28,
+    marginTop: 12,
+    minWidth: 200,
+    alignItems: 'center',
   },
   matchChatBtnText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700' as const,
-    color: '#333',
+    color: '#fff',
+  },
+  matchKeepBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
   },
   matchKeepText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 8,
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500' as const,
   },
   detailsOverlay: {
     flex: 1,

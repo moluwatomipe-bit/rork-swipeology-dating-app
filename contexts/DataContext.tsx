@@ -336,7 +336,8 @@ export const [DataProvider, useData] = createContextHook(() => {
       };
 
       setSwipes((prev) => [...prev, swipe]);
-      createSwipeRecord(
+
+      await createSwipeRecord(
         swipe.user_from,
         swipe.user_to,
         swipe.context,
@@ -345,27 +346,36 @@ export const [DataProvider, useData] = createContextHook(() => {
 
       if (!liked) return null;
 
-      let isMutual = await checkMutualSwipe(
+      console.log('[Data] Checking for mutual swipe...');
+      const isMutual = await checkMutualSwipe(
         currentUser.id,
         userId,
         context
       );
+      console.log('[Data] Mutual swipe result:', isMutual);
 
       if (!isMutual) return null;
 
-      let match = await createMatchSupabase(
+      console.log('[Data] MUTUAL MATCH DETECTED! Creating match record...');
+      const match = await createMatchSupabase(
         currentUser.id,
         userId,
         context
       );
 
-      if (!match) return null;
+      if (!match) {
+        console.log('[Data] Failed to create match record');
+        return null;
+      }
 
+      console.log('[Data] Match created successfully:', match.id);
       setMatches((prev) => {
         const updated = new Map(prev);
         updated.set(match.id, match);
         return updated;
       });
+
+      queryClient.invalidateQueries({ queryKey: ['matches', currentUser.id] });
 
       return match;
     },

@@ -125,21 +125,39 @@ export async function createSwipeRecord(
   userTo: string,
   context: 'friends' | 'dating',
   liked: boolean
-) {
+): Promise<boolean> {
   console.log('[Supabase] Creating swipe:', userFrom, '->', userTo, liked ? 'LIKE' : 'PASS');
 
   const { error } = await supabase
     .from('swipes')
-    .insert({
-      user_from: userFrom,
-      user_to: userTo,
-      context,
-      liked,
-    });
+    .upsert(
+      {
+        user_from: userFrom,
+        user_to: userTo,
+        context,
+        liked,
+      },
+      { onConflict: 'user_from,user_to,context', ignoreDuplicates: false }
+    );
 
   if (error) {
     console.log('[Supabase] Create swipe error:', error.message);
+    const { error: insertError } = await supabase
+      .from('swipes')
+      .insert({
+        user_from: userFrom,
+        user_to: userTo,
+        context,
+        liked,
+      });
+    if (insertError) {
+      console.log('[Supabase] Fallback insert swipe error:', insertError.message);
+      return false;
+    }
   }
+
+  console.log('[Supabase] Swipe saved successfully');
+  return true;
 }
 
 /* -------------------------------------------------------
