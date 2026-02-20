@@ -190,6 +190,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const syncData: Record<string, unknown> = { ...updates };
       delete syncData.password;
       delete syncData.id;
+      delete syncData.icebreaker_answers;
+      delete syncData.personality_badges;
       console.log('[Auth] Syncing user updates to Supabase:', Object.keys(syncData));
       supabase
         .from('users')

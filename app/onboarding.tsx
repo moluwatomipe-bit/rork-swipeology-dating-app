@@ -1482,8 +1482,6 @@ export default function OnboardingScreen() {
               major: major.trim(),
               class_year: classYear.trim(),
               interests: interests.trim(),
-              icebreaker_answers: icebreakerAnswers,
-              personality_badges: selectedBadges,
             };
 
             const { error: upsertError } = await supabase
