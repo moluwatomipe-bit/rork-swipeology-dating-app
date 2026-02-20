@@ -75,25 +75,18 @@ export const [DataProvider, useData] = createContextHook(() => {
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
 
-
-
-  /* -------------------------------------------------------
-     INTERNAL STATE (Maps)
-  ------------------------------------------------------- */
   const [matches, setMatches] = useState<Map<string, Match>>(new Map());
   const [messages, setMessages] = useState<Map<string, Message[]>>(new Map());
   const [swipes, setSwipes] = useState<Swipe[]>([]);
   const [supabaseUsers, setSupabaseUsers] = useState<User[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  /* -------------------------------------------------------
-     FETCH EXISTING SWIPES FROM SUPABASE
-  ------------------------------------------------------- */
   const swipesQuery = useQuery({
     queryKey: ['swipes', currentUser?.id],
-    enabled: !!currentUser,
+    enabled: !!currentUser?.id,
     queryFn: async () => {
       if (!currentUser) return [];
-      console.log('[Data] Fetching existing swipes from Supabase for:', currentUser.id);
+      console.log('[Data] Fetching swipes for:', currentUser.id);
       const { data, error } = await supabase
         .from('swipes')
         .select('*')
@@ -104,7 +97,7 @@ export const [DataProvider, useData] = createContextHook(() => {
         return [];
       }
 
-      console.log('[Data] Fetched existing swipes:', data?.length ?? 0);
+      console.log('[Data] Fetched swipes:', data?.length ?? 0);
       return (data ?? []).map((d: any): Swipe => ({
         id: d.id ?? `swipe_${d.user_from}_${d.user_to}`,
         user_from: d.user_from,
@@ -114,27 +107,23 @@ export const [DataProvider, useData] = createContextHook(() => {
         created_at: d.created_at ?? new Date().toISOString(),
       }));
     },
-    staleTime: 60000,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   useEffect(() => {
     if (swipesQuery.data) {
       setSwipes(swipesQuery.data);
-      console.log('[Data] Swipes loaded from Supabase:', swipesQuery.data.length);
+      console.log('[Data] Swipes synced:', swipesQuery.data.length);
     }
   }, [swipesQuery.data]);
 
-  /* -------------------------------------------------------
-     FETCH ALL USERS FROM SUPABASE
-     Uses select('*') to avoid column-name mismatches that
-     would silently return zero rows.
-  ------------------------------------------------------- */
   const mapRowToUser = (d: Record<string, any>): User => {
     const { wantsFriends, wantsDating } = resolveWantsFlags(d);
     const gender = normalizeGender(d.gender);
     const datingPref = normalizeDatingPref(d.dating_preference ?? d.gender_preference);
 
-    console.log(`[Data] mapRowToUser: id=${d.id}, name=${d.first_name ?? d.name}, raw_gender=${d.gender}, norm_gender=${gender}, raw_pref=${d.dating_preference ?? d.gender_preference}, norm_pref=${datingPref}, raw_mode=${d.mode ?? d.intent}, wF=${wantsFriends}, wD=${wantsDating}`);
+    console.log(`[Data] mapRow: id=${d.id}, name=${d.first_name ?? d.name}, gender=${gender}, pref=${datingPref}, wF=${wantsFriends}, wD=${wantsDating}`);
 
     return {
       id: d.id ?? '',
@@ -169,22 +158,25 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const allUsersQuery = useQuery({
     queryKey: ['all-users'],
-    enabled: !!currentUser,
+    enabled: !!currentUser?.id,
     queryFn: async () => {
-      console.log('[Data] Fetching ALL users from Supabase with select("*")');
+      console.log('[Data] ===== FETCHING ALL USERS FROM SUPABASE =====');
+      setFetchError(null);
+
       const { data, error } = await supabase
         .from('users')
         .select('*');
 
       if (error) {
-        console.log('[Data] Fetch users error:', error.message, JSON.stringify(error));
+        console.log('[Data] Users table error:', error.message);
         console.log('[Data] Trying profiles table as fallback...');
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*');
 
         if (profileError) {
-          console.log('[Data] Profiles fallback error:', profileError.message);
+          console.log('[Data] Profiles table also failed:', profileError.message);
+          setFetchError(`Users: ${error.message} | Profiles: ${profileError.message}`);
           return [];
         }
 
@@ -197,45 +189,44 @@ export const [DataProvider, useData] = createContextHook(() => {
       }
 
       const rows = (data ?? []) as Record<string, any>[];
-      console.log('[Data] Fetched users from Supabase:', rows.length);
+      console.log('[Data] Fetched users count:', rows.length);
       if (rows.length > 0) {
         console.log('[Data] Sample user keys:', Object.keys(rows[0]));
-        console.log('[Data] Sample user data:', JSON.stringify(rows[0]).slice(0, 500));
+        rows.forEach((r, i) => {
+          console.log(`[Data] DB Row[${i}]: id=${r.id}, name=${r.first_name ?? r.name}, gender=${r.gender}, mode=${r.mode ?? r.intent}, wf=${r.wants_friends}, wd=${r.wants_dating}, pref=${r.dating_preference ?? r.gender_preference}`);
+        });
       } else {
-        console.log('[Data] WARNING: users table returned 0 rows');
+        console.log('[Data] WARNING: 0 rows returned from users table');
       }
 
       return rows.map(mapRowToUser);
     },
-    staleTime: 15000,
+    staleTime: 0,
     refetchOnMount: 'always' as const,
-    refetchInterval: 60000,
+    refetchInterval: 30000,
     retry: 3,
   });
 
   useEffect(() => {
     if (allUsersQuery.data) {
       setSupabaseUsers(allUsersQuery.data);
-      console.log('[Data] Supabase users loaded:', allUsersQuery.data.length);
+      console.log('[Data] supabaseUsers state updated:', allUsersQuery.data.length);
     }
   }, [allUsersQuery.data]);
 
-  /* -------------------------------------------------------
-     LOAD MATCHES FROM SUPABASE (React Query)
-  ------------------------------------------------------- */
   const matchesQuery = useQuery({
     queryKey: ['matches', currentUser?.id],
-    enabled: !!currentUser,
+    enabled: !!currentUser?.id,
     queryFn: async () => {
       if (!currentUser) return [];
-      const supaMatches = await fetchMatchesForUser(currentUser.id);
-      return supaMatches;
+      return fetchMatchesForUser(currentUser.id);
     },
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   useEffect(() => {
     if (!matchesQuery.data) return;
-
     const map = new Map<string, Match>();
     for (const m of matchesQuery.data) {
       map.set(m.id, m);
@@ -243,33 +234,22 @@ export const [DataProvider, useData] = createContextHook(() => {
     setMatches(map);
   }, [matchesQuery.data]);
 
-  /* -------------------------------------------------------
-     LOAD MESSAGES FROM ASYNC STORAGE (Map format)
-  ------------------------------------------------------- */
   useEffect(() => {
     (async () => {
       const stored = await AsyncStorage.getItem(STORAGE_MESSAGES);
       if (!stored) return;
-
       const parsed = JSON.parse(stored) as Record<string, Message[]>;
       const map = new Map<string, Message[]>();
-
       for (const matchId of Object.keys(parsed)) {
         const sorted = parsed[matchId].sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() -
-            new Date(b.created_at).getTime()
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         map.set(matchId, sorted);
       }
-
       setMessages(map);
     })();
   }, []);
 
-  /* -------------------------------------------------------
-     SAVE MESSAGES TO ASYNC STORAGE
-  ------------------------------------------------------- */
   const persistMessages = useCallback(async (map: Map<string, Message[]>) => {
     const obj: Record<string, Message[]> = {};
     for (const [matchId, arr] of map.entries()) {
@@ -278,46 +258,29 @@ export const [DataProvider, useData] = createContextHook(() => {
     await AsyncStorage.setItem(STORAGE_MESSAGES, JSON.stringify(obj));
   }, []);
 
-  /* -------------------------------------------------------
-     REAL-TIME MATCH SUBSCRIPTION
-  ------------------------------------------------------- */
   useEffect(() => {
     if (!currentUser?.id) return;
-
     const unsubscribe = subscribeToMatches(currentUser.id, (newMatch) => {
       setMatches((prev) => {
         const updated = new Map(prev);
         updated.set(newMatch.id, newMatch);
         return updated;
       });
-
-      queryClient.invalidateQueries({
-        queryKey: ['matches', currentUser.id],
-      });
+      queryClient.invalidateQueries({ queryKey: ['matches', currentUser.id] });
     });
-
     return unsubscribe;
   }, [currentUser?.id, queryClient]);
 
-  /* -------------------------------------------------------
-     REAL-TIME MESSAGE SUBSCRIPTION
-  ------------------------------------------------------- */
   const subscribeToMatchMessages = useCallback(
     (matchId: string) => {
       return subscribeToMessages(matchId, (msg) => {
         setMessages((prev) => {
           const updated = new Map(prev);
           const arr = updated.get(matchId) || [];
-
-          // prevent duplicates
           if (arr.some((m) => m.id === msg.id)) return prev;
-
           const newArr = [...arr, msg].sort(
-            (a, b) =>
-              new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
-
           updated.set(matchId, newArr);
           persistMessages(updated);
           return updated;
@@ -327,16 +290,11 @@ export const [DataProvider, useData] = createContextHook(() => {
     [persistMessages]
   );
 
-  /* -------------------------------------------------------
-     SEND MESSAGE (NO TEMP IDs)
-  ------------------------------------------------------- */
   const sendMessage = useCallback(
     async (matchId: string, text: string) => {
       if (!currentUser) return;
-
       const sent = await sendMessageToMatch(matchId, currentUser.id, text);
       if (!sent) return;
-
       setMessages((prev) => {
         const updated = new Map(prev);
         const arr = updated.get(matchId) || [];
@@ -348,28 +306,20 @@ export const [DataProvider, useData] = createContextHook(() => {
     [currentUser, persistMessages]
   );
 
-  /* -------------------------------------------------------
-     LOAD MESSAGES FOR MATCH FROM SUPABASE
-  ------------------------------------------------------- */
   const loadMessagesForMatch = useCallback(
     async (matchId: string) => {
       const supaMessages = await fetchMessagesForMatch(matchId);
-
       setMessages((prev) => {
         const updated = new Map(prev);
         updated.set(matchId, supaMessages);
         persistMessages(updated);
         return updated;
       });
-
       return subscribeToMatchMessages(matchId);
     },
     [persistMessages, subscribeToMatchMessages]
   );
 
-  /* -------------------------------------------------------
-     SWIPING + MATCH CREATION (STABLE)
-  ------------------------------------------------------- */
   const performSwipe = useCallback(
     async (
       userId: string,
@@ -389,38 +339,25 @@ export const [DataProvider, useData] = createContextHook(() => {
 
       setSwipes((prev) => [...prev, swipe]);
 
-      await createSwipeRecord(
-        swipe.user_from,
-        swipe.user_to,
-        swipe.context,
-        swipe.liked
-      );
+      await createSwipeRecord(swipe.user_from, swipe.user_to, swipe.context, swipe.liked);
 
       if (!liked) return null;
 
       console.log('[Data] Checking for mutual swipe...');
-      const isMutual = await checkMutualSwipe(
-        currentUser.id,
-        userId,
-        context
-      );
+      const isMutual = await checkMutualSwipe(currentUser.id, userId, context);
       console.log('[Data] Mutual swipe result:', isMutual);
 
       if (!isMutual) return null;
 
-      console.log('[Data] MUTUAL MATCH DETECTED! Creating match record...');
-      const match = await createMatchSupabase(
-        currentUser.id,
-        userId,
-        context
-      );
+      console.log('[Data] MUTUAL MATCH! Creating match...');
+      const match = await createMatchSupabase(currentUser.id, userId, context);
 
       if (!match) {
         console.log('[Data] Failed to create match record');
         return null;
       }
 
-      console.log('[Data] Match created successfully:', match.id);
+      console.log('[Data] Match created:', match.id);
       setMatches((prev) => {
         const updated = new Map(prev);
         updated.set(match.id, match);
@@ -428,19 +365,14 @@ export const [DataProvider, useData] = createContextHook(() => {
       });
 
       queryClient.invalidateQueries({ queryKey: ['matches', currentUser.id] });
-
       return match;
     },
-    [currentUser]
+    [currentUser, queryClient]
   );
 
-  /* -------------------------------------------------------
-     GETTERS
-  ------------------------------------------------------- */
   const getMatchesForContext = useCallback(
     (context: 'friends' | 'dating'): (Match & { otherUser: User })[] => {
       if (!currentUser) return [];
-
       const blockedIds = currentUser.blocked_users || [];
 
       return Array.from(matches.values())
@@ -448,7 +380,6 @@ export const [DataProvider, useData] = createContextHook(() => {
         .map((m) => {
           const otherId = m.user1 === currentUser.id ? m.user2 : m.user1;
           if (blockedIds.includes(otherId)) return null;
-
           const otherUser = supabaseUsers.find((u) => u.id === otherId);
           return otherUser ? { ...m, otherUser } : null;
         })
@@ -467,29 +398,22 @@ export const [DataProvider, useData] = createContextHook(() => {
   const getOtherUserForMatch = useCallback(
     (matchId: string): User | null => {
       if (!currentUser) return null;
-
       const match = matches.get(matchId);
       if (!match) return null;
-
       const otherId = match.user1 === currentUser.id ? match.user2 : match.user1;
       return supabaseUsers.find((u) => u.id === otherId) || null;
     },
     [currentUser, matches, supabaseUsers]
   );
 
-  /* -------------------------------------------------------
-     REMOVE MATCH
-  ------------------------------------------------------- */
   const removeMatch = useCallback(
     async (matchId: string) => {
       await deleteMatchRecord(matchId);
-
       setMatches((prev) => {
         const updated = new Map(prev);
         updated.delete(matchId);
         return updated;
       });
-
       setMessages((prev) => {
         const updated = new Map(prev);
         updated.delete(matchId);
@@ -499,108 +423,87 @@ export const [DataProvider, useData] = createContextHook(() => {
     },
     [persistMessages]
   );
-const refreshUsers = useCallback(async () => {
-  console.log('[Data] Manual refresh triggered');
-  await queryClient.invalidateQueries({ queryKey: ['all-users'] });
-  await queryClient.refetchQueries({ queryKey: ['all-users'] });
-  await queryClient.invalidateQueries({ queryKey: ['swipes', currentUser?.id] });
-  await queryClient.refetchQueries({ queryKey: ['swipes', currentUser?.id] });
-}, [queryClient, currentUser?.id]);
 
-const getAllAvailableUsers = useCallback((): User[] => {
-  return supabaseUsers;
-}, [supabaseUsers]);
+  const refreshUsers = useCallback(async () => {
+    console.log('[Data] ===== MANUAL REFRESH TRIGGERED =====');
+    queryClient.removeQueries({ queryKey: ['all-users'] });
+    queryClient.removeQueries({ queryKey: ['swipes', currentUser?.id] });
+    await queryClient.refetchQueries({ queryKey: ['all-users'] });
+    await queryClient.refetchQueries({ queryKey: ['swipes', currentUser?.id] });
+    console.log('[Data] ===== REFRESH COMPLETE =====');
+  }, [queryClient, currentUser?.id]);
 
-const getFilteredUsers = useCallback(
-  (context: 'friends' | 'dating'): User[] => {
-    if (!currentUser) {
-      console.log('[Data] getFilteredUsers: no currentUser');
-      return [];
-    }
+  const getFilteredUsers = useCallback(
+    (context: 'friends' | 'dating'): User[] => {
+      if (!currentUser) {
+        console.log('[Data] getFilteredUsers: no currentUser');
+        return [];
+      }
 
-    const blockedIds = currentUser.blocked_users || [];
-    const allUsers = getAllAvailableUsers();
+      const blockedIds = currentUser.blocked_users || [];
 
-    console.log('[Data] getFilteredUsers context:', context, 'total users:', allUsers.length, 'currentUser:', currentUser.id);
+      console.log('[Data] getFilteredUsers:', context, '| total supabaseUsers:', supabaseUsers.length, '| currentUser:', currentUser.id, '| name:', currentUser.first_name);
 
-    if (allUsers.length > 0) {
-      allUsers.forEach((u, i) => {
-        console.log(`[Data] User[${i}]: id=${u.id}, name=${u.first_name}, gender=${u.gender}, wants_friends=${u.wants_friends}, wants_dating=${u.wants_dating}, pref=${u.dating_preference}`);
+      const swipedUserIds = new Set(
+        swipes
+          .filter((s) => s.user_from === currentUser.id && s.context === context)
+          .map((s) => s.user_to)
+      );
+
+      console.log('[Data] Already swiped in', context, ':', swipedUserIds.size);
+
+      const filtered = supabaseUsers.filter((u) => {
+        if (u.id === currentUser.id) {
+          return false;
+        }
+
+        if (swipedUserIds.has(u.id)) {
+          return false;
+        }
+
+        if (blockedIds.includes(u.id)) {
+          return false;
+        }
+
+        if ((u.blocked_users || []).includes(currentUser.id)) {
+          return false;
+        }
+
+        if (context === 'dating') {
+          if (u.wants_dating === false && u.wants_friends === true) {
+            console.log(`[Data] Skip ${u.first_name} from dating: wants friends only`);
+            return false;
+          }
+
+          const myPref = normalizeDatingPref(currentUser.dating_preference);
+          const theirGender = normalizeGender(u.gender);
+          const theirPref = normalizeDatingPref(u.dating_preference);
+          const myGender = normalizeGender(currentUser.gender);
+
+          if (myPref === 'men' && theirGender !== 'man') {
+            return false;
+          }
+          if (myPref === 'women' && theirGender !== 'woman') {
+            return false;
+          }
+
+          if (theirPref === 'men' && myGender !== 'man') {
+            return false;
+          }
+          if (theirPref === 'women' && myGender !== 'woman') {
+            return false;
+          }
+        }
+
+        console.log(`[Data] INCLUDE ${u.first_name || u.id} in ${context}`);
+        return true;
       });
-    }
 
-    const swipedUserIds = swipes
-      .filter((s) => s.user_from === currentUser.id && s.context === context)
-      .map((s) => s.user_to);
-
-    console.log('[Data] Swiped user IDs for', context, ':', swipedUserIds.length, swipedUserIds);
-
-    const filtered = allUsers.filter((u) => {
-      if (u.id === currentUser.id) {
-        return false;
-      }
-      if (swipedUserIds.includes(u.id)) {
-        console.log(`[Data] Skipping ${u.first_name}: already swiped in ${context}`);
-        return false;
-      }
-      if (blockedIds.includes(u.id)) {
-        return false;
-      }
-      if ((u.blocked_users || []).includes(currentUser.id)) {
-        return false;
-      }
-
-      if (!u.first_name || u.first_name.trim() === '') {
-        console.log(`[Data] Skipping user ${u.id}: no name`);
-        return false;
-      }
-
-      if (context === 'friends') {
-        if (u.wants_friends === false) {
-          console.log(`[Data] Filtering out ${u.first_name}: does not want friends (wF=${u.wants_friends}, wD=${u.wants_dating})`);
-          return false;
-        }
-      }
-
-      if (context === 'dating') {
-        if (u.wants_dating === false) {
-          console.log(`[Data] Filtering out ${u.first_name}: does not want dating (wD=${u.wants_dating}, wF=${u.wants_friends})`);
-          return false;
-        }
-
-        const myPref = normalizeDatingPref(currentUser.dating_preference);
-        const theirGender = normalizeGender(u.gender);
-        const theirPref = normalizeDatingPref(u.dating_preference);
-        const myGender = normalizeGender(currentUser.gender);
-
-        if (myPref === 'men' && theirGender !== 'man') {
-          console.log(`[Data] Filtering out ${u.first_name}: my pref=${myPref}, their gender=${theirGender}`);
-          return false;
-        }
-        if (myPref === 'women' && theirGender !== 'woman') {
-          console.log(`[Data] Filtering out ${u.first_name}: my pref=${myPref}, their gender=${theirGender}`);
-          return false;
-        }
-
-        if (theirPref === 'men' && myGender !== 'man') {
-          console.log(`[Data] Filtering out ${u.first_name}: their pref=${theirPref}, my gender=${myGender}`);
-          return false;
-        }
-        if (theirPref === 'women' && myGender !== 'woman') {
-          console.log(`[Data] Filtering out ${u.first_name}: their pref=${theirPref}, my gender=${myGender}`);
-          return false;
-        }
-      }
-
-      console.log(`[Data] INCLUDED ${u.first_name} in ${context} feed`);
-      return true;
-    });
-
-    console.log('[Data] Filtered users for', context, ':', filtered.length);
-    return filtered;
-  },
-  [currentUser, swipes, getAllAvailableUsers]
-);
+      console.log('[Data] Filtered result for', context, ':', filtered.length, 'users');
+      return filtered;
+    },
+    [currentUser, swipes, supabaseUsers]
+  );
 
   const isUsersLoading = allUsersQuery.isLoading || swipesQuery.isLoading;
 
@@ -619,5 +522,7 @@ const getFilteredUsers = useCallback(
     isUsersLoading,
     refreshUsers,
     totalSupabaseUsers: supabaseUsers.length,
+    fetchError,
+    isRefreshing: allUsersQuery.isFetching,
   };
 });

@@ -40,7 +40,7 @@ const theme = Colors.dark;
 export default function SwipeScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser } = useAuth();
-  const { getFilteredUsers, performSwipe, isUsersLoading, refreshUsers, totalSupabaseUsers } = useData();
+  const { getFilteredUsers, performSwipe, isUsersLoading, refreshUsers, totalSupabaseUsers, fetchError, isRefreshing } = useData();
   const [activeTab, setActiveTab] = useState<'friends' | 'dating'>('friends');
   const [cardIndex, setCardIndex] = useState<number>(0);
   const [matchPopup, setMatchPopup] = useState<{ match: Match; user: User } | null>(null);
@@ -154,11 +154,20 @@ export default function SwipeScreen() {
     position.setValue({ x: 0, y: 0 });
   }, [position]);
 
+  const [isManualRefreshing, setIsManualRefreshing] = useState<boolean>(false);
+
   const handleRefresh = useCallback(async () => {
     console.log('[Swipe] Refresh triggered');
-    await refreshUsers();
-    setCardIndex(0);
-    position.setValue({ x: 0, y: 0 });
+    setIsManualRefreshing(true);
+    try {
+      await refreshUsers();
+      setCardIndex(0);
+      position.setValue({ x: 0, y: 0 });
+    } catch (e) {
+      console.log('[Swipe] Refresh error:', e);
+    } finally {
+      setIsManualRefreshing(false);
+    }
   }, [refreshUsers, position]);
 
   const getUserBadges = (user: User) => {
@@ -505,7 +514,7 @@ export default function SwipeScreen() {
       </View>
 
       <View style={styles.deckContainer}>
-        {isUsersLoading ? (
+        {isUsersLoading && !isManualRefreshing ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
               <Sparkles size={48} color={theme.textMuted} />
@@ -524,19 +533,29 @@ export default function SwipeScreen() {
                 <Heart size={48} color={theme.textMuted} />
               )}
             </View>
-            <Text style={styles.emptyTitle}>No more profiles</Text>
+            <Text style={styles.emptyTitle}>
+              {isManualRefreshing ? 'Refreshing...' : 'No more profiles'}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              {totalSupabaseUsers <= 1
-                ? 'No other users have signed up yet. Check back soon!'
-                : `Check back later for new ${activeTab === 'friends' ? 'friends' : 'matches'}`}
+              {fetchError
+                ? `Error loading users: ${fetchError}`
+                : totalSupabaseUsers <= 1
+                  ? 'No other users have signed up yet. Check back soon!'
+                  : `Check back later for new ${activeTab === 'friends' ? 'friends' : 'matches'}`}
+            </Text>
+            <Text style={styles.debugText}>
+              {`DB users: ${totalSupabaseUsers} | Tab: ${activeTab}`}
             </Text>
             <TouchableOpacity
-              style={styles.refreshBtn}
+              style={[styles.refreshBtn, isManualRefreshing && { opacity: 0.6 }]}
               onPress={handleRefresh}
               activeOpacity={0.7}
               testID="refresh-btn"
+              disabled={isManualRefreshing}
             >
-              <Text style={styles.refreshBtnText}>Refresh</Text>
+              <Text style={styles.refreshBtnText}>
+                {isManualRefreshing ? 'Refreshing...' : 'Refresh'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -1214,5 +1233,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700' as const,
+  },
+  debugText: {
+    fontSize: 11,
+    color: theme.textMuted,
+    marginTop: 4,
   },
 });
