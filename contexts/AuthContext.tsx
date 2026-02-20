@@ -19,14 +19,43 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const [profileChecked, setProfileChecked] = useState<boolean>(false);
   const queryClient = useQueryClient();
 
+  const SAFE_COLUMNS = [
+    'id',
+    'phone_number',
+    'phone_verified',
+    'school_email',
+    'university',
+    'is_verified_esu',
+    'first_name',
+    'age',
+    'gender',
+    'pronouns',
+    'dating_preference',
+    'wants_friends',
+    'wants_dating',
+    'photo1_url',
+    'photo2_url',
+    'photo3_url',
+    'photo4_url',
+    'photo5_url',
+    'photo6_url',
+    'bio',
+    'major',
+    'class_year',
+    'interests',
+    'blocked_users',
+  ].join(',');
+
   const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
     console.log('[Auth] Checking users table for user:', userId);
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('users')
-        .select('*')
+        .select(SAFE_COLUMNS)
         .eq('id', userId)
         .single();
+
+      const data = rawData as Record<string, any> | null;
 
       if (error) {
         console.log('[Auth] Profile lookup error:', error.message);
@@ -34,7 +63,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
 
       if (data) {
-        console.log('[Auth] Profile found for user:', userId);
+        console.log('[Auth] Profile found for user:', userId, 'keys:', Object.keys(data));
         const profile: User = {
           id: data.id ?? userId,
           phone_number: data.phone_number ?? '',
@@ -61,8 +90,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           class_year: data.class_year ?? '',
           interests: data.interests ?? '',
           blocked_users: data.blocked_users ?? [],
-          icebreaker_answers: data.icebreaker_answers ?? {},
-          personality_badges: data.personality_badges ?? [],
+          icebreaker_answers: {},
+          personality_badges: [],
         };
         return profile;
       }
@@ -187,11 +216,21 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     saveUser(updated);
 
     if (session?.user?.id) {
-      const syncData: Record<string, unknown> = { ...updates };
-      delete syncData.password;
-      delete syncData.id;
-      delete syncData.icebreaker_answers;
-      delete syncData.personality_badges;
+      const SYNCABLE_KEYS = new Set([
+        'phone_number', 'phone_verified', 'school_email', 'university',
+        'is_verified_esu', 'first_name', 'age', 'gender', 'pronouns',
+        'dating_preference', 'wants_friends', 'wants_dating',
+        'photo1_url', 'photo2_url', 'photo3_url', 'photo4_url',
+        'photo5_url', 'photo6_url', 'bio', 'major', 'class_year',
+        'interests', 'blocked_users',
+      ]);
+      const syncData: Record<string, unknown> = {};
+      for (const key of Object.keys(updates)) {
+        if (SYNCABLE_KEYS.has(key)) {
+          syncData[key] = (updates as Record<string, unknown>)[key];
+        }
+      }
+      if (Object.keys(syncData).length === 0) return;
       console.log('[Auth] Syncing user updates to Supabase:', Object.keys(syncData));
       supabase
         .from('users')

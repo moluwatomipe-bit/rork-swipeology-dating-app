@@ -40,7 +40,7 @@ const theme = Colors.dark;
 export default function SwipeScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser } = useAuth();
-  const { getFilteredUsers, performSwipe, isUsersLoading } = useData();
+  const { getFilteredUsers, performSwipe, isUsersLoading, refreshUsers, totalSupabaseUsers } = useData();
   const [activeTab, setActiveTab] = useState<'friends' | 'dating'>('friends');
   const [cardIndex, setCardIndex] = useState<number>(0);
   const [matchPopup, setMatchPopup] = useState<{ match: Match; user: User } | null>(null);
@@ -145,6 +145,13 @@ export default function SwipeScreen() {
     setShowDetails(false);
     position.setValue({ x: 0, y: 0 });
   }, [position]);
+
+  const handleRefresh = useCallback(async () => {
+    console.log('[Swipe] Refresh triggered');
+    await refreshUsers();
+    setCardIndex(0);
+    position.setValue({ x: 0, y: 0 });
+  }, [refreshUsers, position]);
 
   const getUserBadges = (user: User) => {
     const badges = user.personality_badges || [];
@@ -511,8 +518,18 @@ export default function SwipeScreen() {
             </View>
             <Text style={styles.emptyTitle}>No more profiles</Text>
             <Text style={styles.emptySubtitle}>
-              Check back later for new {activeTab === 'friends' ? 'friends' : 'matches'}
+              {totalSupabaseUsers <= 1
+                ? 'No other users have signed up yet. Check back soon!'
+                : `Check back later for new ${activeTab === 'friends' ? 'friends' : 'matches'}`}
             </Text>
+            <TouchableOpacity
+              style={styles.refreshBtn}
+              onPress={handleRefresh}
+              activeOpacity={0.7}
+              testID="refresh-btn"
+            >
+              <Text style={styles.refreshBtnText}>Refresh</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -1113,5 +1130,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700' as const,
     color: theme.text,
+  },
+  refreshBtn: {
+    marginTop: 16,
+    backgroundColor: theme.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  refreshBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700' as const,
   },
 });

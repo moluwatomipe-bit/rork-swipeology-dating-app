@@ -78,22 +78,55 @@ export const [DataProvider, useData] = createContextHook(() => {
   /* -------------------------------------------------------
      FETCH ALL USERS FROM SUPABASE
   ------------------------------------------------------- */
+  const SAFE_USER_COLUMNS = [
+    'id',
+    'phone_number',
+    'phone_verified',
+    'school_email',
+    'university',
+    'is_verified_esu',
+    'first_name',
+    'age',
+    'gender',
+    'pronouns',
+    'dating_preference',
+    'wants_friends',
+    'wants_dating',
+    'photo1_url',
+    'photo2_url',
+    'photo3_url',
+    'photo4_url',
+    'photo5_url',
+    'photo6_url',
+    'bio',
+    'major',
+    'class_year',
+    'interests',
+    'blocked_users',
+  ].join(',');
+
   const allUsersQuery = useQuery({
     queryKey: ['all-users'],
     enabled: !!currentUser,
     queryFn: async () => {
-      console.log('[Data] Fetching all users from Supabase');
+      console.log('[Data] Fetching all users from Supabase (safe columns)');
       const { data, error } = await supabase
         .from('users')
-        .select('*');
+        .select(SAFE_USER_COLUMNS);
 
       if (error) {
-        console.log('[Data] Fetch users error:', error.message);
+        console.log('[Data] Fetch users error:', error.message, JSON.stringify(error));
         return [];
       }
 
-      console.log('[Data] Fetched users from Supabase:', data?.length ?? 0);
-      return (data ?? []).map((d: any): User => ({
+      const rows = (data ?? []) as Record<string, any>[];
+      console.log('[Data] Fetched users from Supabase:', rows.length);
+      if (rows.length > 0) {
+        console.log('[Data] Sample user keys:', Object.keys(rows[0]));
+        console.log('[Data] Sample user first_name:', rows[0].first_name, 'id:', rows[0].id);
+      }
+
+      return rows.map((d: any): User => ({
         id: d.id ?? '',
         phone_number: d.phone_number ?? '',
         phone_verified: d.phone_verified ?? false,
@@ -119,11 +152,12 @@ export const [DataProvider, useData] = createContextHook(() => {
         class_year: d.class_year ?? '',
         interests: d.interests ?? '',
         blocked_users: d.blocked_users ?? [],
-        icebreaker_answers: d.icebreaker_answers ?? {},
-        personality_badges: d.personality_badges ?? [],
+        icebreaker_answers: {},
+        personality_badges: [],
       }));
     },
-    staleTime: 60000,
+    staleTime: 30000,
+    refetchOnMount: 'always' as const,
   });
 
   useEffect(() => {
@@ -402,6 +436,12 @@ export const [DataProvider, useData] = createContextHook(() => {
     },
     [persistMessages]
   );
+const refreshUsers = useCallback(async () => {
+  console.log('[Data] Manual refresh triggered');
+  await queryClient.invalidateQueries({ queryKey: ['all-users'] });
+  await queryClient.invalidateQueries({ queryKey: ['swipes', currentUser?.id] });
+}, [queryClient, currentUser?.id]);
+
 const getAllAvailableUsers = useCallback((): User[] => {
   return supabaseUsers;
 }, [supabaseUsers]);
@@ -425,23 +465,16 @@ const getFilteredUsers = useCallback(
       if (blockedIds.includes(u.id)) return false;
       if ((u.blocked_users || []).includes(currentUser.id)) return false;
 
-      if (!u.first_name && !u.photo1_url) return false;
+      if (!u.first_name) return false;
 
       if (context === 'friends') {
         return true;
       }
 
       if (context === 'dating') {
-        if (!u.wants_dating || !currentUser.wants_dating) return false;
-
         if (currentUser.dating_preference === 'men' && u.gender !== 'man')
           return false;
         if (currentUser.dating_preference === 'women' && u.gender !== 'woman')
-          return false;
-
-        if (u.dating_preference === 'men' && currentUser.gender !== 'man')
-          return false;
-        if (u.dating_preference === 'women' && currentUser.gender !== 'woman')
           return false;
 
         return true;
@@ -471,5 +504,7 @@ const getFilteredUsers = useCallback(
     loadMessagesForMatch,
     getFilteredUsers,
     isUsersLoading,
+    refreshUsers,
+    totalSupabaseUsers: supabaseUsers.length,
   };
 });
